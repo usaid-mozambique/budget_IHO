@@ -58,6 +58,7 @@ PROGRAM_SUB_ELEMENT_FILTER <- c("A0158", "A0159", "A0161", "A0162",
 #READ ALL FUNCTIONS ------------------------------------'
 
 source("Scripts/utilities.R")
+source("Scripts/tests.R")
 
 #READ DATA----------------------------------------
 
@@ -112,3 +113,7 @@ phoenix_transaction_df <- map(phoenix_transaction_input_file,
 
 
 
+#RUN TESTS ------------------------------------------------------------------
+award_exists <- test_awards(active_awards_df, subobligation_summary_df, 
+                            phoenix_pipeline_df, phoenix_transaction_df) %>% 
+    write_csv("Dataout/awards_exist.csv")
