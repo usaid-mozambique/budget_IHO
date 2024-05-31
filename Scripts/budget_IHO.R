@@ -27,7 +27,6 @@ PHOENIX_TRANSACTION_FOLDER_PATH <- "Data/phoenix_transactions/"
 PHOENIX_PIPELINE_FOLDER_PATH <- "Data/phoenix_pipeline/"
 
 
-
 #FILTERS------------------------------------------------
 PROGRAM_AREA_FILTER <- c("A11", "A26", "EG.3", "EG.10", "HL.1",
                          "HL.2", "HL.3", "HL.4","HL.5", "HL.6", "HL.7",
@@ -112,8 +111,27 @@ phoenix_transaction_df <- map(phoenix_transaction_input_file,
 # CREATE PIPELINE DATASET (one row per award, per quarter per program area name)
 
 
+active_awards_one_row <- active_awards_df %>% 
+    left_join(subobligation_summary_df, by = c("award_number", "period")) %>% 
+    filter(!str_detect(activity_name, "MEL")) %>% 
+    left_join(phoenix_pipeline_df, by = c("award_number", "period", "program_area")) 
+
+#TODO move this logic to utilities in create transaction
+phoenix_transaction_quarter <- phoenix_transaction_df %>% 
+    mutate(fiscal_transaction_date = transaction_date %m+% months(3),
+           period = paste0("FY", year(fiscal_transaction_date) %% 100, 
+                           "Q", quarter(fiscal_transaction_date))
+    ) %>% 
+    select(-c(fiscal_transaction_date, transaction_date, transaction_event)) %>% 
+    group_by(award_number, period, program_area) %>% 
+    summarise(across(where(is.numeric), sum), .groups = "drop") 
+
+active_awards_one_row_phoenix <- active_awards_one_row %>% 
+    left_join(phoenix_transaction_quarter, by = c("award_number", "period", "program_area")) %>% 
+    write_csv("Dataout/pipeline.csv")
 
 #RUN TESTS ------------------------------------------------------------------
+
 award_exists <- test_awards(active_awards_df, subobligation_summary_df, 
-                            phoenix_pipeline_df, phoenix_transaction_df) %>% 
+                            phoenix_pipeline_df, phoenix_transaction_quarter) %>% 
     write_csv("Dataout/awards_exist.csv")

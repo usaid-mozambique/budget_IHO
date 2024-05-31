@@ -13,17 +13,17 @@ test_awards <- function(active_awards, subobligation_summary, phoenix_pipeline,
         distinct() %>% 
         mutate(subobligation_summary = "exists")
   
-  #  transaction <- phoenix_transaction %>% 
-  #      select(award_number, period) %>% 
-  #      distinct() %>% 
-  #      mutate(transaction = "exists")
+    transaction <- phoenix_transaction %>% 
+        select(award_number, period) %>% 
+        distinct() %>% 
+        mutate(transaction = "exists")
     
     active_award_tbl <- active_awards %>% 
         select(activity_name, award_number, period) %>% 
         distinct() %>% 
         left_join(subobligation_summary_df, by = c("award_number", "period")) %>%  
-        left_join(pipeline, by = c("award_number", "period")) #%>% 
-  #      left_join(transaction, by = c("award_number", "period")) 
+        left_join(pipeline, by = c("award_number", "period")) %>% 
+        left_join(transaction, by = c("award_number", "period")) 
     
     return(active_award_tbl)
     
