@@ -66,7 +66,7 @@ active_awards_input_file <- dir(ACTIVE_AWARDS_FOLDER_PATH,
                                 full.name = TRUE,
                                 pattern = "*.xlsx")
 
-active_awards_df <- map(active_awards_input_file, create_active_awards) %>% 
+active_awards_df <- map(active_awards_input_file, create_active_awards) |> 
     bind_rows()
 
 
@@ -75,15 +75,15 @@ sub_obligation_input_file <- dir(SUBOBLIGATION_SUMMARY_FOLDER_PATH,
                                  full.name = TRUE, 
                                  pattern = "*.xlsx")
 
-subobligation_summary_df <- map(sub_obligation_input_file, create_subobligation_summary) %>% 
+subobligation_summary_df <- map(sub_obligation_input_file, create_subobligation_summary) |> 
     bind_rows()
 
 
 #List of all active award numbers
 #all active award IDs
-active_award_number <- active_awards_df %>% 
-    select(award_number) %>% 
-    distinct() %>% 
+active_award_number <- active_awards_df |> 
+    select(award_number) |> 
+    distinct() |> 
     pull()
 
 
@@ -93,7 +93,7 @@ phoenix_pipeline_input_file <- dir(PHOENIX_PIPELINE_FOLDER_PATH,
                                    pattern = "*.xlsx")
 
 phoenix_pipeline_df <- map(phoenix_pipeline_input_file, 
-                           ~create_phoenix_pipeline(.x, active_award_number)) %>%
+                           ~create_phoenix_pipeline(.x, active_award_number)) |>
     bind_rows()
 
 
@@ -104,34 +104,45 @@ phoenix_transaction_input_file <- dir(PHOENIX_TRANSACTION_FOLDER_PATH,
 
 
 phoenix_transaction_df <- map(phoenix_transaction_input_file, 
-                              ~create_phoenix_transaction(.x, active_award_number)) %>% 
+                              ~create_phoenix_transaction(.x, active_award_number)) |> 
     bind_rows() 
 
 
 # CREATE PIPELINE DATASET (one row per award, per quarter per program area name)
 
-
-active_awards_one_row <- active_awards_df %>% 
-    left_join(subobligation_summary_df, by = c("award_number", "period")) %>% 
-    filter(!str_detect(activity_name, "MEL")) %>% 
+active_awards_one_row <- active_awards_df |> 
+    left_join(subobligation_summary_df, by = c("award_number", "period")) |> 
+    filter(!str_detect(activity_name, "MEL")) |> 
     left_join(phoenix_pipeline_df, by = c("award_number", "period", "program_area")) 
 
-#TODO move this logic to utilities in create transaction
-phoenix_transaction_quarter <- phoenix_transaction_df %>% 
-    mutate(fiscal_transaction_date = transaction_date %m+% months(3),
-           period = paste0("FY", year(fiscal_transaction_date) %% 100, 
-                           "Q", quarter(fiscal_transaction_date))
-    ) %>% 
-    select(-c(fiscal_transaction_date, transaction_date, transaction_event)) %>% 
-    group_by(award_number, period, program_area) %>% 
+
+phoenix_transaction_quarter <- phoenix_transaction_df |> 
+    group_by(award_number, period, program_area) |> 
     summarise(across(where(is.numeric), sum), .groups = "drop") 
 
-active_awards_one_row_phoenix <- active_awards_one_row %>% 
-    left_join(phoenix_transaction_quarter, by = c("award_number", "period", "program_area")) %>% 
-    write_csv("Dataout/pipeline.csv")
+active_awards_one_row_phoenix <- active_awards_one_row |> 
+    left_join(phoenix_transaction_quarter, by = c("award_number", "period", "program_area"))
+    
+write_csv(active_awards_one_row_phoenix,"Dataout/pipeline.csv")
+
+
+# CREATE TRANSACTION DATASET (one row per award, per transaction per program area)
+
+active_awards_one_row_transaction <- active_awards_df |> 
+    select(award_number, activity_name) |> 
+    distinct() |> 
+    left_join(phoenix_transaction_df, by = "award_number") |> 
+    select(award_number, activity_name,transaction_date, transaction_event, transaction_amt)
+write_csv(active_awards_one_row_transaction, "Dataout/transaction.csv")
 
 #RUN TESTS ------------------------------------------------------------------
 
 award_exists <- test_awards(active_awards_df, subobligation_summary_df, 
-                            phoenix_pipeline_df, phoenix_transaction_quarter) %>% 
-    write_csv("Dataout/awards_exist.csv")
+                            phoenix_pipeline_df, phoenix_transaction_quarter)
+
+write_csv(award_exists, "Dataout/awards_exist.csv")
+
+
+    
+
+
