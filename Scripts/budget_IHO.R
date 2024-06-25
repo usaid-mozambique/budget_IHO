@@ -132,7 +132,8 @@ active_awards_one_row_transaction <- active_awards_df |>
     select(award_number, activity_name) |> 
     distinct() |> 
     left_join(phoenix_transaction_df, by = "award_number") |> 
-    select(award_number, activity_name,transaction_date, transaction_event, transaction_amt)
+    select(award_number, activity_name,transaction_date,transaction_disbursement,
+           transaction_obligation, transaction_amt)
 write_csv(active_awards_one_row_transaction, "Dataout/transaction.csv")
 
 #RUN TESTS ------------------------------------------------------------------
