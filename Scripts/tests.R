@@ -1,4 +1,6 @@
 
+# TODO all NAS are added to the top of the list
+
 test_awards <- function(active_awards, subobligation_summary, phoenix_pipeline, 
                         phoenix_transaction) {
     

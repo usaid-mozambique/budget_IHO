@@ -14,13 +14,17 @@ library(janitor)
 library(lubridate)
 library(glamr)
 
-# OTHER SETUP--------------------------------------
+# OTHER SETUP  - only run one-time --------------------------------------
 
-folder_setup()  #only run one-time
-
+folder_setup() 
+folder_setup(folder_list = list("Data/subobligation_summary", 
+                                "Data/active_awards", 
+                                "Data/phoenix_transactions", 
+                                "Data/phoenix_pipeline"))
 
 #PATHS---------------------------------------------
 
+# This should match the existing folder structure
 SUBOBLIGATION_SUMMARY_FOLDER_PATH <-  "Data/subobligation_summary/"
 ACTIVE_AWARDS_FOLDER_PATH <- "Data/active_awards/"
 PHOENIX_TRANSACTION_FOLDER_PATH <- "Data/phoenix_transactions/"
