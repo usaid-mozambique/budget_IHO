@@ -37,13 +37,15 @@ create_active_awards <- function(ACTIVE_AWARDS_PATH){
 #'
 #' @examples
 create_subobligation_summary <- function(SUBOBLIGATION_SUMMARY_PATH){
-    temp <- readxl::read_xlsx(SUBOBLIGATION_SUMMARY_PATH) |> 
+    temp <- readxl::read_xlsx(SUBOBLIGATION_SUMMARY_PATH, 
+                              skip = 1) |> 
         mutate(filename = basename(SUBOBLIGATION_SUMMARY_PATH)) |> 
         clean_names() |> 
         mutate(award_number = str_trim(award_number),
                period = str_extract(filename, "^[^_]+")
                
         ) |> 
+        filter(implementing_mechanism != "Total") |>
         select(-c(filename, implementing_mechanism)) |> 
         drop_na(award_number) |> 
         rename("program_area_name" = "program_area") |> 
@@ -60,7 +62,8 @@ create_subobligation_summary <- function(SUBOBLIGATION_SUMMARY_PATH){
                                         program_area_name == "Human Rights" ~ "DR.6",
                                         program_area_name == "Political Competition and Consensus-Building" ~ "DR.3",
         )) |> 
-        mutate(opu_reprogram = as.numeric(opu_reprogram),
+        mutate(
+              opu_reprogram = as.numeric(opu_reprogram),
                planned_subobligations_for_the_next_months = as.numeric(planned_subobligations_for_the_next_months),
                total_obligations_this_fy = as.numeric(total_obligations_this_fy),
                projected_monthly_burn_rate = as.numeric(projected_monthly_burn_rate),
@@ -68,8 +71,17 @@ create_subobligation_summary <- function(SUBOBLIGATION_SUMMARY_PATH){
                planned_sub_oblig_date = ymd(planned_sub_oblig_date),
                approved_budget_cop_op = as.numeric(approved_budget_cop_op),
                unliquidated_obligations_at_the_beginning_of_the_fy = as.numeric(unliquidated_obligations_at_the_beginning_of_the_fy),
-               across(where(is.numeric), ~ ifelse(is.na(.), NA_real_, .))) |> 
+               across(where(is.numeric), ~ ifelse(is.na(.), NA_real_, .))
+               )  |> 
         mutate_if(is.numeric, ~replace_na(., 0)) 
+    
+    temp_comments <- temp |> 
+        select(award_number, period, comments) |> 
+        drop_na(comments)
+    
+    temp <- temp |>
+        select(-comments) |> 
+        left_join(temp_comments, by = c("award_number", "period"))
     
     return(temp)
 }

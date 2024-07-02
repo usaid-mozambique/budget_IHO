@@ -1,4 +1,5 @@
-required_packages <- c("tidyverse", "janitor", "lubridate", "glamr")
+required_packages <- c("dplyr","purrr", "tidyr","stringr", "janitor", "lubridate", "glamr",
+                       "readxl", "readr")
 
 missing_packages <- required_packages[!(required_packages %in% installed.packages()
                                         [,"Package"])]
@@ -8,11 +9,15 @@ if(length(missing_packages) >0){
                                                  "https://cloud.r-project.org"))
 }
 
-
-library(tidyverse)
 library(janitor)
 library(lubridate)
 library(glamr)
+library(dplyr)
+library(purrr)
+library(tidyr)
+library(stringr)
+library(readxl)
+library(readr)
 
 # OTHER SETUP  - only run one-time --------------------------------------
 
@@ -21,6 +26,7 @@ folder_setup(folder_list = list("Data/subobligation_summary",
                                 "Data/active_awards", 
                                 "Data/phoenix_transactions", 
                                 "Data/phoenix_pipeline"))
+
 
 #PATHS---------------------------------------------
 
@@ -132,12 +138,21 @@ write_csv(active_awards_one_row_phoenix,"Dataout/pipeline.csv")
 
 # CREATE TRANSACTION DATASET (one row per award, per transaction per program area)
 
+#latest active awards with accrual 
+active_awards_accrual_latest <- active_awards_one_row_phoenix |> 
+    filter(period == max(period)) |> 
+    group_by(award_number, period) |> 
+    summarise(last_qtr_accrual_amt = sum(last_qtr_accrual_amt, na.rm = TRUE), .groups = "drop")
+
 active_awards_one_row_transaction <- active_awards_df |> 
     select(award_number, activity_name) |> 
     distinct() |> 
     left_join(phoenix_transaction_df, by = "award_number") |> 
     select(award_number, activity_name,transaction_date,transaction_disbursement,
-           transaction_obligation, transaction_amt)
+           transaction_obligation, transaction_amt, avg_monthly_exp_rate, period) |> 
+    left_join(active_awards_accrual_latest, join_by(award_number == "award_number", period == period)) 
+
+
 write_csv(active_awards_one_row_transaction, "Dataout/transaction.csv")
 
 #RUN TESTS ------------------------------------------------------------------
