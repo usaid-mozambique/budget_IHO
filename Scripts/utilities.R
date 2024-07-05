@@ -37,7 +37,8 @@ create_active_awards <- function(ACTIVE_AWARDS_PATH){
 #'
 #' @examples
 create_subobligation_summary <- function(SUBOBLIGATION_SUMMARY_PATH){
-    temp <- readxl::read_xlsx(SUBOBLIGATION_SUMMARY_PATH, 
+    temp <- readxl::read_xlsx(SUBOBLIGATION_SUMMARY_PATH,
+                              sheet = "Sheet1", 
                               skip = 1) |> 
         mutate(filename = basename(SUBOBLIGATION_SUMMARY_PATH)) |> 
         clean_names() |> 
@@ -114,7 +115,8 @@ create_phoenix_pipeline <- function(PHOENIX_PIPELINE_PATH, active_award_number){
         select(program_element, bfy_fund, obligation_type, document_amt, 
                obligation_amt, subobligation_amt, disbursement_amt, 
                undisbursed_amt, last_qtr_accrual_amt,document_number,
-               program_area, distribution, award_number, program_sub_element
+               program_area, distribution, award_number, program_sub_element,
+               program_element
         ) |> 
         
         mutate(filename = basename(PHOENIX_PIPELINE_PATH),
@@ -122,20 +124,37 @@ create_phoenix_pipeline <- function(PHOENIX_PIPELINE_PATH, active_award_number){
                document_amt = as.numeric(document_amt),
                disbursement_amt = as.numeric(disbursement_amt),
                undisbursed_amt = as.numeric(undisbursed_amt),
-               last_qtr_accrual_amt = as.numeric(last_qtr_accrual_amt)) |> 
+               last_qtr_accrual_amt = as.numeric(last_qtr_accrual_amt),
+               program_area_new = case_when(program_element == "A047" ~ "HL.1", 
+                                            program_element == "A048"~ "HL.2",
+                                            program_element == "A049"~ "HL.3",
+                                            program_element == "A050"~ "HL.4",
+                                            program_element == "A051"~ "HL.5",
+                                            program_element == "A052"~ "HL.6",
+                                            program_element == "A053"~ "HL.7",
+                                            program_element == "A054"~ "HL.8",
+                                            program_element == "A142"~ "HL.9",
+                                            program_element == "A026"~ "PO.1",
+                                            program_element == "A027"~ "DR.2",
+                                            program_element == "A140"~ "PO.1",
+                                            TRUE ~ program_area)
+                   
+               
+               ) |> 
+
         
-        group_by(award_number, program_element, bfy_fund, obligation_type,document_number,
-                 program_area, distribution, program_sub_element, period) |> 
+        group_by(award_number,  bfy_fund, obligation_type,document_number,
+                 program_area_new, distribution, period) |> 
         summarise(across(where(is.numeric), sum), .groups = "drop") |> 
         
         mutate(total_disbursement_outlays = disbursement_amt + last_qtr_accrual_amt) |> 
-        select(-c(program_element, bfy_fund, obligation_type, distribution,
-                  program_sub_element)) |> 
+        select(-c( bfy_fund, obligation_type, distribution)) |> 
         mutate(award_number = case_when(
             award_number %in% active_award_number ~ award_number,
             TRUE ~ document_number)
         ) |> 
         select(-document_number) |>
+        rename(program_area = program_area_new) |> 
         group_by(award_number, period, program_area) |>
         summarise(across(where(is.numeric), sum), .groups = "drop")
     
@@ -172,18 +191,33 @@ create_phoenix_transaction <- function(PHOENIX_TRANSACTION_PATH, active_award_nu
             transaction_date = floor_date(transaction_date, unit = "quarter"),
             fiscal_transaction_date = transaction_date %m+% months(3),
             period = paste0("FY", year(fiscal_transaction_date) %% 100, 
-                            "Q", quarter(fiscal_transaction_date))
+                            "Q", quarter(fiscal_transaction_date)),
+            program_area_new = case_when(program_element == "A047" ~ "HL.1", 
+                                         program_element == "A048" ~ "HL.2",
+                                         program_element == "A049" ~ "HL.3",
+                                         program_element == "A050" ~ "HL.4",
+                                         program_element == "A051" ~ "HL.5",
+                                         program_element == "A052" ~ "HL.6",
+                                         program_element == "A053" ~ "HL.7",
+                                         program_element == "A054" ~ "HL.8",
+                                         program_element == "A142" ~ "HL.9",
+                                         program_element == "A026" ~ "PO.1",
+                                         program_element == "A027" ~ "DR.2",
+                                         program_element == "A140" ~ "PO.1",
+                                         TRUE ~ program_area)
             
         ) |> 
         
-        select(award_number, distribution, program_area, program_sub_element, bfy_fund,
+        select(award_number, distribution, bfy_fund,
                transaction_event, transaction_amt, period, transaction_date, document_number, 
-               obl_document_number, transaction_event_type) |> 
-        group_by(award_number, distribution, program_area, program_sub_element, bfy_fund,
-                 transaction_event, transaction_event_type, period, transaction_date, document_number, obl_document_number) |> 
+               obl_document_number, transaction_event_type,  program_area_new) |> 
+        group_by(award_number, distribution,  bfy_fund,
+                 transaction_event, transaction_event_type, period, transaction_date, document_number, obl_document_number,
+                  program_area_new) |> 
         summarise(transaction_amt = sum(transaction_amt, na.rm = TRUE), .groups = "drop") |> 
         select(award_number, period, transaction_date, transaction_amt, transaction_event, 
-               document_number, obl_document_number, program_area, transaction_event_type) |> 
+               document_number, obl_document_number,   program_area_new,
+               transaction_event_type) |> 
         mutate(award_number = case_when(
             award_number %in% active_award_number ~ award_number,
             document_number %in% active_award_number ~ document_number,
@@ -196,8 +230,9 @@ create_phoenix_transaction <- function(PHOENIX_TRANSACTION_PATH, active_award_nu
                                            .default = NA_real_),
         avg_monthly_exp_rate = transaction_disbursement/3
         ) |> 
-        group_by(award_number, transaction_date, program_area, period) |> 
-        summarise(across(where(is.numeric), ~sum(., na.rm = TRUE)), .groups = "drop")
+        group_by(award_number, transaction_date, period,  program_area_new) |> 
+        summarise(across(where(is.numeric), ~sum(., na.rm = TRUE)), .groups = "drop") |> 
+        rename(program_area = program_area_new)
     
     return(temp)
 }

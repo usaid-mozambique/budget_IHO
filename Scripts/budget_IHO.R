@@ -36,7 +36,6 @@ ACTIVE_AWARDS_FOLDER_PATH <- "Data/active_awards/"
 PHOENIX_TRANSACTION_FOLDER_PATH <- "Data/phoenix_transactions/"
 PHOENIX_PIPELINE_FOLDER_PATH <- "Data/phoenix_pipeline/"
 
-
 #FILTERS------------------------------------------------
 PROGRAM_AREA_FILTER <- c("A11", "A26", "EG.3", "EG.10", "HL.1",
                          "HL.2", "HL.3", "HL.4","HL.5", "HL.6", "HL.7",
@@ -106,7 +105,6 @@ phoenix_pipeline_df <- map(phoenix_pipeline_input_file,
                            ~create_phoenix_pipeline(.x, active_award_number)) |>
     bind_rows()
 
-
 # Phoenix - transaction
 phoenix_transaction_input_file <- dir(PHOENIX_TRANSACTION_FOLDER_PATH,
                                       full.name = TRUE,
@@ -117,6 +115,12 @@ phoenix_transaction_df <- map(phoenix_transaction_input_file,
                               ~create_phoenix_transaction(.x, active_award_number)) |> 
     bind_rows() 
 
+
+
+test <- phoenix_pipeline_df |> 
+    filter(award_number %in% active_award_number) |> 
+    select(award_number, program_area) |> 
+    distinct()
 
 # CREATE PIPELINE DATASET (one row per award, per quarter per program area name)
 
@@ -160,9 +164,18 @@ write_csv(active_awards_one_row_transaction, "Dataout/transaction.csv")
 award_exists <- test_awards(active_awards_df, subobligation_summary_df, 
                             phoenix_pipeline_df, phoenix_transaction_quarter)
 
+
 write_csv(award_exists, "Dataout/awards_exist.csv")
 
+program_exists_pipeline <- test_program_area(active_awards_df, subobligation_summary_df, 
+                                    phoenix_pipeline_df, active_award_number)
 
-    
+program_exists_transaction <- test_program_area(active_awards_df, subobligation_summary_df, 
+                                    phoenix_transaction_df, active_award_number)
 
+
+program_exists_area <- test_program_area_from_phoenix(active_awards_df, subobligation_summary_df, 
+                                    phoenix_pipeline_df, active_award_number)  
+
+unique(program_exists_area$award_number)
 
