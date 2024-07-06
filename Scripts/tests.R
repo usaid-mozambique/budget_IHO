@@ -31,46 +31,73 @@ test_awards <- function(active_awards, subobligation_summary, phoenix_pipeline,
     
 }
 
-test_program_area <- function(active_awards, subobligation_summary, phoenix, 
-                               active_award_number) {
-    
-    program_active_awards_sub <- active_awards |> 
-        left_join(subobligation_summary, by = c("award_number", "period")) |>
-        select(activity_name, award_number, program_area, program_area_name, period) |> 
-        distinct() 
-    
-    program_phoenix <- phoenix |> 
-        select(program_area, award_number, period) |> 
-      filter(award_number %in% active_award_number) |>
-        mutate(phoenix = "exists") |> 
-        distinct()
-
-    temp <- program_active_awards_sub |> 
-        left_join(program_phoenix, by = c("award_number", "period", "program_area")) |> 
-        distinct()
-    
-    return(temp)
+#' Title
+#'
+#' @param active_awards 
+#' @param subobligation_summary 
+#' @param phoenix_transaction 
+#' @param phoenix_pipeline 
+#' @param active_award_number 
+#'
+#' @return
+#' @export
+#'
+#' @examples
+test_program_area <- function(active_awards, subobligation_summary, phoenix_transaction,
+                              phoenix_pipeline, active_award_number) {
+  
+  program_area_in_suboblgiation<- active_awards |> 
+    left_join(subobligation_summary, by = c("award_number", "period")) |>
+    select(program_area, period) |> 
+    filter(!is.na(program_area)) |> 
+    mutate(subobligation = "yes") |> 
+    distinct() 
+  
+  
+  program_area_in_pipeline <- phoenix_pipeline |> 
+    filter(award_number %in% active_award_number) |>
+    select(program_area, period) |> 
+    mutate(pipeline = "yes") |> 
+    distinct()
+  
+  program_area_in_transaction <- phoenix_transaction |> 
+    filter(award_number %in% active_award_number) |>
+    select(program_area, period) |> 
+    mutate(transaction = "yes") |> 
+    distinct()
+  
+  
+  all_program_area <- program_area_in_suboblgiation |> 
+    full_join(program_area_in_pipeline, by = c("program_area", "period")) |> 
+    full_join(program_area_in_transaction, by = c("program_area", "period")) |> 
+    distinct() |> 
+    arrange(period, program_area)
+  
+  return(all_program_area)
     
 }
 
 
-test_program_area_from_phoenix <- function(active_awards, subobligation_summary, phoenix, 
-                               active_award_number) {
-    
-    program_active_awards_sub <- active_awards |> 
-       left_join(subobligation_summary, by = c("award_number", "period")) |>
-       select(activity_name, award_number, program_area, program_area_name, period) |> 
-        distinct() 
-    
-    program_phoenix <- phoenix |> 
-        select(program_area, award_number, period) |>
-        filter(award_number %in% active_award_number) |>
-        distinct()
-
-    temp <-  program_phoenix|> 
-        left_join(program_active_awards_sub, by = c("award_number", "period", "program_area")) |> 
-        distinct()
-    
-    return(temp)
+#' Title
+#'
+#' @param active_awards 
+#' @param subobligation_summary 
+#'
+#' @return
+#' @export
+#'
+#' @examples
+test_missing_program_area <- function(active_awards, subobligation_summary) {
+  
+  temp <- active_awards |> 
+    left_join(subobligation_summary, by = c("award_number", "period")) |> 
+    filter(!is.na(activity_name)) |> 
+    select(award_number, period, activity_name, program_area) |> 
+    distinct() |> 
+    filter(is.na(program_area))
+  
+  return(temp)
     
 }
+
+

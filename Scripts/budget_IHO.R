@@ -117,11 +117,6 @@ phoenix_transaction_df <- map(phoenix_transaction_input_file,
 
 
 
-test <- phoenix_pipeline_df |> 
-    filter(award_number %in% active_award_number) |> 
-    select(award_number, program_area) |> 
-    distinct()
-
 # CREATE PIPELINE DATASET (one row per award, per quarter per program area name)
 
 active_awards_one_row <- active_awards_df |> 
@@ -163,19 +158,20 @@ write_csv(active_awards_one_row_transaction, "Dataout/transaction.csv")
 
 award_exists <- test_awards(active_awards_df, subobligation_summary_df, 
                             phoenix_pipeline_df, phoenix_transaction_quarter)
-
-
 write_csv(award_exists, "Dataout/awards_exist.csv")
 
-program_exists_pipeline <- test_program_area(active_awards_df, subobligation_summary_df, 
-                                    phoenix_pipeline_df, active_award_number)
-
-program_exists_transaction <- test_program_area(active_awards_df, subobligation_summary_df, 
-                                    phoenix_transaction_df, active_award_number)
+# shows missing program areas - needed to bring all data over
+program_area_missing <- test_missing_program_area(active_awards_df, subobligation_summary_df)
+write_csv(program_area_missing, "Dataout/program_area_missing.csv")
 
 
-program_exists_area <- test_program_area_from_phoenix(active_awards_df, subobligation_summary_df, 
-                                    phoenix_pipeline_df, active_award_number)  
+# program area missing 
+program_area_test <- test_program_area(active_awards_df, subobligation_summary_df, 
+                                       phoenix_transaction_df, phoenix_pipeline_df, active_award_number)
+write_csv(program_area_test, "Dataout/program_area_all_datasets.csv")
 
-unique(program_exists_area$award_number)
+
+
+
+
 

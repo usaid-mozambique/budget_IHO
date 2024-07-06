@@ -64,7 +64,6 @@ create_subobligation_summary <- function(SUBOBLIGATION_SUMMARY_PATH){
                                         program_area_name == "Political Competition and Consensus-Building" ~ "DR.3",
         )) |> 
         mutate(
-              opu_reprogram = as.numeric(opu_reprogram),
                planned_subobligations_for_the_next_months = as.numeric(planned_subobligations_for_the_next_months),
                total_obligations_this_fy = as.numeric(total_obligations_this_fy),
                projected_monthly_burn_rate = as.numeric(projected_monthly_burn_rate),
@@ -75,14 +74,16 @@ create_subobligation_summary <- function(SUBOBLIGATION_SUMMARY_PATH){
                across(where(is.numeric), ~ ifelse(is.na(.), NA_real_, .))
                )  |> 
         mutate_if(is.numeric, ~replace_na(., 0)) 
+ 
+    #TODO what to do with comments?   
+ #   temp_comments <- temp |> 
+ #       select(award_number, period, comments) |> 
+ #       drop_na(comments) |> 
+ #       distinct()
     
-    temp_comments <- temp |> 
-        select(award_number, period, comments) |> 
-        drop_na(comments)
-    
-    temp <- temp |>
-        select(-comments) |> 
-        left_join(temp_comments, by = c("award_number", "period"))
+ #   temp <- temp |>
+ #       select(-comments) |> 
+ #       left_join(temp_comments, by = c("award_number", "period"))
     
     return(temp)
 }
