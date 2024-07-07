@@ -136,7 +136,7 @@ create_phoenix_pipeline <- function(PHOENIX_PIPELINE_PATH, active_award_number){
                                             program_element == "A054"~ "HL.8",
                                             program_element == "A142"~ "HL.9",
                                             program_element == "A026"~ "PO.1",
-                                            program_element == "A027"~ "DR.2",
+                                            program_element == "A027"~ "PO.2",
                                             program_element == "A140"~ "PO.1",
                                             TRUE ~ program_area)
                    
@@ -203,7 +203,7 @@ create_phoenix_transaction <- function(PHOENIX_TRANSACTION_PATH, active_award_nu
                                          program_element == "A054" ~ "HL.8",
                                          program_element == "A142" ~ "HL.9",
                                          program_element == "A026" ~ "PO.1",
-                                         program_element == "A027" ~ "DR.2",
+                                         program_element == "A027" ~ "PO.2",
                                          program_element == "A140" ~ "PO.1",
                                          TRUE ~ program_area)
             
