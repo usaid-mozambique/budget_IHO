@@ -74,16 +74,15 @@ create_subobligation_summary <- function(SUBOBLIGATION_SUMMARY_PATH){
                across(where(is.numeric), ~ ifelse(is.na(.), NA_real_, .))
                )  |> 
         mutate_if(is.numeric, ~replace_na(., 0)) 
- 
-    #TODO what to do with comments?   
- #   temp_comments <- temp |> 
- #       select(award_number, period, comments) |> 
- #       drop_na(comments) |> 
- #       distinct()
+
+    temp_comments <- temp |> 
+        select(award_number, period, comments) |> 
+        drop_na(comments) |> 
+        distinct()
     
- #   temp <- temp |>
- #       select(-comments) |> 
- #       left_join(temp_comments, by = c("award_number", "period"))
+    temp <- temp |>
+        select(-comments) |> 
+        left_join(temp_comments, by = c("award_number", "period"))
     
     return(temp)
 }
@@ -135,8 +134,7 @@ create_phoenix_pipeline <- function(PHOENIX_PIPELINE_PATH, active_award_number){
                                             program_element == "A053"~ "HL.7",
                                             program_element == "A054"~ "HL.8",
                                             program_element == "A142"~ "HL.9",
-                                            program_element == "A026"~ "PO.1",
-                                            program_element == "A027"~ "PO.2",
+                                            program_element == "A141"~ "PO.2",
                                             program_element == "A140"~ "PO.1",
                                             TRUE ~ program_area)
                    
@@ -202,8 +200,7 @@ create_phoenix_transaction <- function(PHOENIX_TRANSACTION_PATH, active_award_nu
                                          program_element == "A053" ~ "HL.7",
                                          program_element == "A054" ~ "HL.8",
                                          program_element == "A142" ~ "HL.9",
-                                         program_element == "A026" ~ "PO.1",
-                                         program_element == "A027" ~ "PO.2",
+                                         program_element == "A141" ~ "PO.2",
                                          program_element == "A140" ~ "PO.1",
                                          TRUE ~ program_area)
             

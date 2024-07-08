@@ -100,4 +100,25 @@ test_missing_program_area <- function(active_awards, subobligation_summary) {
     
 }
 
+test_po_2 <- function(active_awards, phoenix_pipeline, phoenix_transaction, active_award_number){
+  pipeline <- phoenix_pipeline |> 
+    filter(award_number %in% active_award_number,
+           program_area == "PO.2")
+  
+  transaction <- phoenix_transaction |> 
+    filter(award_number %in% active_award_number,
+           program_area == "PO.2")
+  
+  awards <- active_awards |> 
+    select(award_number, activity_name, period)
+  
+  po_2_data <- pipeline |> 
+    full_join(transaction, by = c("award_number", "period")) |> 
+    left_join(awards, by = c("award_number", "period")) |> 
+    select(award_number, activity_name, period, everything())
+  
+  return(po_2_data)
+  
+}
+
 

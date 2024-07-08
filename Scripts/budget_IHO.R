@@ -9,6 +9,8 @@ if(length(missing_packages) >0){
                                                  "https://cloud.r-project.org"))
 }
 
+options(scipen=999) 
+
 library(janitor)
 library(lubridate)
 library(glamr)
@@ -39,7 +41,7 @@ PHOENIX_PIPELINE_FOLDER_PATH <- "Data/phoenix_pipeline/"
 #FILTERS------------------------------------------------
 PROGRAM_AREA_FILTER <- c("A11", "A26", "EG.3", "EG.10", "HL.1",
                          "HL.2", "HL.3", "HL.4","HL.5", "HL.6", "HL.7",
-                         "HL.8", "HL.9", "PO.1", "DR.3", "DR.4", "DR.6")
+                         "HL.8", "HL.9", "PO.1", "PO.2", "DR.3", "DR.4", "DR.6")
 
 
 DISTRIBUTION_FILTER <- c("656-GH-M", "656-GH-W", "656-W", "656-M")
@@ -172,6 +174,7 @@ write_csv(program_area_test, "Dataout/program_area_all_datasets.csv")
 
 
 
+po_2_test <- test_po_2(active_awards_df, phoenix_pipeline_df, phoenix_transaction_df, active_award_number)
 
 
 
