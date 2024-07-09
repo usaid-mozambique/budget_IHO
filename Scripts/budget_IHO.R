@@ -173,8 +173,10 @@ program_area_test <- test_program_area(active_awards_df, subobligation_summary_d
 write_csv(program_area_test, "Dataout/program_area_all_datasets.csv")
 
 
-
+# Data not included in Tableau - but shows if anything has been assigned to the program area PO.2
 po_2_test <- test_po_2(active_awards_df, phoenix_pipeline_df, phoenix_transaction_df, active_award_number)
+
+write_csv(po_2_test, "Dataout/po_2_test.csv")
 
 
 
