@@ -17,16 +17,21 @@ create_active_awards <- function(ACTIVE_AWARDS_PATH){
         filter(sector == "IHO") |> 
         mutate(award_number = str_trim(award_number),
                filename = basename(ACTIVE_AWARDS_PATH),
-               period = str_extract(filename, "^[^_]+")
+               period = str_extract(filename, "^[^_]+"),
+               sub_sector = recode(sub_sector, "AFG" = "HTHS",
+                                   "PCMD" = "Family Health")
         ) |> 
-        mutate_if(is.numeric, ~replace_na(., 0)) |> 
+        mutate_if(is.numeric, ~replace_na(., 0)
+                  ) |> 
         select(sub_sector, activity_name, award_number, total_estimated_cost,
                start_date, end_date, u_s_org_local, aor_cor_or_activity_manager,
                period, funding_type, pepfar_funding) |> 
-        drop_na(award_number)
+        drop_na(award_number) 
     
     return(temp)
 }
+
+?recode
 
 
 #' Title
@@ -100,11 +105,13 @@ create_subobligation_summary <- function(SUBOBLIGATION_SUMMARY_PATH){
 #' @export
 #'
 #' @examples
-create_phoenix_pipeline <- function(PHOENIX_PIPELINE_PATH, active_award_number){
+create_phoenix_pipeline <- function(PHOENIX_PIPELINE_PATH, active_award_number, obligation_type_filter, distribution_filter){
     
     temp <- readxl::read_xlsx(PHOENIX_PIPELINE_PATH,
                               col_types = "text") |> 
         clean_names() |> 
+        filter(obligation_type %in% obligation_type_filter,
+               distribution %in% distribution_filter) |>
         select(document_amt, 
                obligation_amt, subobligation_amt, disbursement_amt, 
                undisbursed_amt, last_qtr_accrual_amt,document_number,
@@ -152,12 +159,12 @@ create_phoenix_pipeline <- function(PHOENIX_PIPELINE_PATH, active_award_number){
 #' @export
 #'
 #' @examples
-create_phoenix_transaction <- function(PHOENIX_TRANSACTION_PATH, active_award_number){
+create_phoenix_transaction <- function(PHOENIX_TRANSACTION_PATH, active_award_number, distribution_filter){
     
     temp <- readxl::read_xlsx(PHOENIX_TRANSACTION_PATH,
                               col_types = "text") |> 
         clean_names() |> 
-
+        filter(distribution %in% distribution_filter) |>
         mutate(
             transaction_amt = as.numeric(transaction_amt),
             transaction_date = as_date(as.numeric(transaction_date) - 1, origin = "1899-12-30"),

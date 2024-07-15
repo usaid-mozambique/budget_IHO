@@ -38,13 +38,16 @@ ACTIVE_AWARDS_FOLDER_PATH <- "Data/active_awards/"
 PHOENIX_TRANSACTION_FOLDER_PATH <- "Data/phoenix_transactions/"
 PHOENIX_PIPELINE_FOLDER_PATH <- "Data/phoenix_pipeline/"
 
+#FILTERS ------------------------------------------------
+EVENT_TYPE_FILTER <- c("OBLG_UNI", "OBLG_SUBOB")
+DISTRIBUTION_FILTER <- c("656-M", "656-GH-M", "656-W", "656-GH-W")
 
 #READ ALL FUNCTIONS ------------------------------------'
 
 source("Scripts/utilities.R")
 source("Scripts/tests.R")
 
-#READ DATA----------------------------------------
+#FUNCTIONS----------------------------------------
 create_active_awards_df <- function(ACTIVE_AWARDS_PATH){
     
     active_awards_input_file <- dir(ACTIVE_AWARDS_PATH,
@@ -72,7 +75,9 @@ create_phoenix_pipeline_df <- function(PHOENIX_PIPELINE_PATH){
                                        pattern = "*.xlsx")
     
     phoenix_pipeline_df <- map(phoenix_pipeline_input_file, 
-                               ~create_phoenix_pipeline(.x, active_award_number)) |>
+                               ~create_phoenix_pipeline(.x, active_award_number, 
+                                                        EVENT_TYPE_FILTER,
+                                                        DISTRIBUTION_FILTER)) |>
         bind_rows()
 }
 
@@ -83,7 +88,8 @@ create_phoenix_transaction_df <- function(PHOENIX_TRANSACTION_PATH, active_award
                                          pattern = "*.xlsx")
     
     phoenix_transaction_df <- map(phoenix_transaction_input_file, 
-                                  ~create_phoenix_transaction(.x, active_award_number)) |> 
+                                  ~create_phoenix_transaction(.x, active_award_number,
+                                                              DISTRIBUTION_FILTER)) |> 
         bind_rows()
     
     phoenix_transaction_disbursement_fy <- phoenix_transaction_df |> 
@@ -99,7 +105,9 @@ create_phoenix_transaction_df <- function(PHOENIX_TRANSACTION_PATH, active_award
         select(-c(fiscal_year, quarter))
 }
 
-active_awards_df <- create_active_awards_df(ACTIVE_AWARDS_FOLDER_PATH)
+
+#READ DATA----------------------------------------
+active_awards_df <- create_active_awards_df(ACTIVE_AWARDS_FOLDER_PATH) 
 #all active award IDs
 active_award_number <- active_awards_df |> 
     select(award_number) |> 
@@ -108,32 +116,7 @@ active_award_number <- active_awards_df |>
 
 subobligation_summary_df <- create_sub_obligation_df(SUBOBLIGATION_SUMMARY_FOLDER_PATH)
 phoenix_pipeline_df <- create_phoenix_pipeline_df(PHOENIX_PIPELINE_FOLDER_PATH)
-phoenix_transaction_df2 <- create_phoenix_transaction_df(PHOENIX_TRANSACTION_FOLDER_PATH, active_award_number)
-
-
-# Phoenix - transaction
-#phoenix_transaction_input_file <- dir(PHOENIX_TRANSACTION_FOLDER_PATH,
-#                                      full.name = TRUE,
-#                                      pattern = "*.xlsx")
-
-
-#phoenix_transaction_df <- map(phoenix_transaction_input_file, 
-#                              ~create_phoenix_transaction(.x, active_award_number)) |> 
-#    bind_rows() 
-
-
-#phoenix_transaction_disbursement_fy <- phoenix_transaction_df |> 
-#    select(award_number, fiscal_year, quarter, program_area, transaction_disbursement, period) |>
-#    arrange(award_number, fiscal_year, quarter)  |> 
-#    group_by(award_number, fiscal_year, program_area) |> 
-#    mutate(cumulative_transaction_disbursement_fy = cumsum(transaction_disbursement))  |> 
-#    ungroup() |> 
-#    select(-c(fiscal_year, quarter, transaction_disbursement))
-
-#phoenix_transaction_df <- phoenix_transaction_df |>
-#    left_join(phoenix_transaction_disbursement_fy, by = c("award_number", "period", "program_area")) |> 
-#    select(-c(fiscal_year, quarter))
-
+phoenix_transaction_df <- create_phoenix_transaction_df(PHOENIX_TRANSACTION_FOLDER_PATH, active_award_number)
 
 
 # CREATE PIPELINE DATASET (one row per award, per quarter per program area name)
