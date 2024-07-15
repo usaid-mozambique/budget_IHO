@@ -144,22 +144,17 @@ test_pipeline_number <- function(raw_phoenix_pipeline, raw_active_awards, new_pi
   test_pipeline <- new_pipeline |> 
     group_by(award_number, activity_name, period) |>
     summarise(across(where(is.numeric), ~sum(., na.rm = TRUE)), .groups = "drop") |>
-    select(award_number, activity_name, period, 
-           document_amt, disbursement_amt, last_qtr_accrual_amt) 
+    select(award_number, activity_name, period, document_amt, disbursement_amt) 
   
   test_final <- test_raw_active_pipeline |> 
     left_join(test_pipeline, by = c("award_number", "period", "activity_name")) |> 
     mutate(across(where(is.numeric), ~ replace_na(., 0))) |> 
-    rename(new_document_amt = document_amt, 
-           new_disbursement_amt = disbursement_amt,
-           new_last_qtr_accrual_amt = last_qtr_accrual_amt) |> 
+    rename(new_document_amt = document_amt, new_disbursement_amt = disbursement_amt) |> 
     mutate(disbursement_dif = raw_disbursement_amt - new_disbursement_amt,
-           document_dif = raw_document_amt - new_document_amt,
-           last_qtr_accrual_diff = raw_last_qtr_accrual_amt - new_last_qtr_accrual_amt) |> 
+           document_dif = raw_document_amt - new_document_amt) |> 
     select(award_number, activity_name, period, 
            raw_document_amt, new_document_amt, document_dif, 
-           raw_disbursement_amt, new_disbursement_amt, disbursement_dif,
-           raw_last_qtr_accrual_amt, new_last_qtr_accrual_amt, last_qtr_accrual_diff)  
+           raw_disbursement_amt, new_disbursement_amt, disbursement_dif)  
   
   return(test_final)
   
