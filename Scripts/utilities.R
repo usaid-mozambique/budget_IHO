@@ -31,8 +31,6 @@ create_active_awards <- function(ACTIVE_AWARDS_PATH){
     return(temp)
 }
 
-?recode
-
 
 #' Title
 #'
@@ -69,6 +67,7 @@ create_subobligation_summary <- function(SUBOBLIGATION_SUMMARY_PATH){
                                         program_area_name == "Human Rights" ~ "DR.6",
                                         program_area_name == "Political Competition and Consensus-Building" ~ "DR.3",
         )) |> 
+
         mutate(
             planned_subobligations_for_the_next_months = as.numeric(planned_subobligations_for_the_next_months),
             total_obligations_this_fy = as.numeric(total_obligations_this_fy),
@@ -80,12 +79,13 @@ create_subobligation_summary <- function(SUBOBLIGATION_SUMMARY_PATH){
             across(where(is.numeric), ~ ifelse(is.na(.), NA_real_, .)),
             
         )  |> 
-        separate(period, into = c("fiscal_year", "quarter"), sep = "Q", remove = FALSE) |> 
-        mutate_if(is.numeric, ~replace_na(., 0)) 
+  #      separate(period, into = c("fiscal_year", "quarter"), sep = "Q", remove = FALSE) |> 
+        mutate_if(is.numeric, ~replace_na(., 0)) |> 
+        select(-program_area_name)
     
     temp_comments <- temp |> 
         select(award_number, period, comments) |> 
-        drop_na(comments) |> 
+       drop_na(comments) |> 
         distinct()
     
     temp <- temp |>

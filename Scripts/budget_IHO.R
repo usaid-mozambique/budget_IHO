@@ -105,6 +105,49 @@ create_phoenix_transaction_df <- function(PHOENIX_TRANSACTION_PATH, active_award
         select(-c(fiscal_year, quarter))
 }
 
+create_pipeline_dataset<- function(){
+    
+    active_awards_one_row <- active_awards_df |> 
+        left_join(phoenix_pipeline_df, by = c("award_number", "period")) |> 
+        filter(!str_detect(activity_name, "MEL")) |> #remove MEL
+        left_join(subobligation_summary_df, by = c("award_number", "period", "program_area")) |> 
+        left_join(phoenix_transaction_df, by = c("award_number", "period", "program_area")) |> 
+        mutate(across(where(is.numeric), ~ replace_na(., 0))) |> 
+        mutate(program_area_name = case_when(program_area == "HL.1" ~ "HIV/AIDS",
+                                             program_area == "HL.6" ~ "MCH",
+                                             program_area == "HL.4"~ "GHS" ,
+                                             program_area == "HL.9"~ "Nutrition",
+                                             program_area == "HL.7"~  "FP/RH",
+                                             program_area == "HL.2" ~ "TB",
+                                             program_area == "HL.3" ~ "Malaria",
+                                             program_area == "HL.8" ~ "WASH",
+                                             program_area == "PO.1"~ "PD&L",
+                                             program_area == "DR.4" ~ "Civil Society",
+                                             program_area == "DR.6" ~ "Human Rights",
+                                             program_area == "DR.3" ~ "Political Competition and Consensus-Building",
+                                             TRUE ~ as.character(program_area)    
+                                             
+        ))  
+    
+}
+
+create_transaction_dataset <- function() {
+    #latest active awards with accrual amount
+    active_awards_accrual_latest <- pipeline_dataset |> 
+        filter(period == max(period)) |> 
+        group_by(award_number, period) |> 
+        summarise(last_qtr_accrual_amt = sum(last_qtr_accrual_amt, na.rm = TRUE), .groups = "drop")
+    
+    active_awards_one_row_transaction <- active_awards_df |> 
+        select(award_number, activity_name) |> 
+        distinct() |> #needed as there are multiple lines due to period
+        left_join(phoenix_transaction_df, by = "award_number") |> 
+        select(award_number, activity_name, transaction_disbursement,
+               transaction_obligation, transaction_amt, avg_monthly_exp_rate, period) |> 
+        left_join(active_awards_accrual_latest, by = c("award_number", "period")) |> 
+        mutate(across(where(is.numeric), ~ replace_na(., 0)))  
+    
+}
 
 #READ DATA----------------------------------------
 active_awards_df <- create_active_awards_df(ACTIVE_AWARDS_FOLDER_PATH) 
@@ -121,37 +164,13 @@ phoenix_transaction_df <- create_phoenix_transaction_df(PHOENIX_TRANSACTION_FOLD
 
 # CREATE PIPELINE DATASET (one row per award, per quarter per program area name)
 
-active_awards_one_row <- active_awards_df |> 
-    left_join(phoenix_pipeline_df, by = c("award_number", "period")) |> 
-    filter(!str_detect(activity_name, "MEL")) |> #remove MEL
-    left_join(subobligation_summary_df, by = c("award_number", "period", "program_area")) |> 
-    left_join(phoenix_transaction_df, by = c("award_number", "period", "program_area")) |> 
-    mutate(across(where(is.numeric), ~ replace_na(., 0))) 
-
-#calculate the total obligation_FY in the subobligation summary
-
-
-write_csv(active_awards_one_row,"Dataout/pipeline.csv")
+pipeline_dataset <- create_pipeline_dataset()
+write_csv(pipeline_dataset,"Dataout/pipeline.csv")
 
 
 # CREATE TRANSACTION DATASET (one row per award, per transaction per program area)
-
-#latest active awards with accrual amount
-active_awards_accrual_latest <- active_awards_one_row |> 
-    filter(period == max(period)) |> 
-    group_by(award_number, period) |> 
-    summarise(last_qtr_accrual_amt = sum(last_qtr_accrual_amt, na.rm = TRUE), .groups = "drop")
-
-active_awards_one_row_transaction <- active_awards_df |> 
-    select(award_number, activity_name) |> 
-    distinct() |> #needed as there are multiple lines due to period
-    left_join(phoenix_transaction_df, by = "award_number") |> 
-    select(award_number, activity_name, transaction_disbursement,
-           transaction_obligation, transaction_amt, avg_monthly_exp_rate, period) |> 
-    left_join(active_awards_accrual_latest, by = c("award_number", "period")) |> 
-    mutate(across(where(is.numeric), ~ replace_na(., 0)))
-
-write_csv(active_awards_one_row_transaction, "Dataout/transaction.csv")
+transaction_dataset <- create_transaction_dataset()
+write_csv(transaction_dataset, "Dataout/transaction.csv")
 
 #RUN TESTS ------------------------------------------------------------------
 
@@ -177,7 +196,7 @@ write_csv(test_po_2_exists, "Dataout/po_2_test.csv")
 
 #checking numbers in raw data
 
-test_raw_pipeline <- test_pipeline_number(phoenix_pipeline_df, active_awards_df, active_awards_one_row)
+test_raw_pipeline <- test_pipeline_number(phoenix_pipeline_df, active_awards_df, pipeline_dataset)
 write_csv(test_raw_pipeline, "Dataout/pipeline_test_all.csv")
 
 
