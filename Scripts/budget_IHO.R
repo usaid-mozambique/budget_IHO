@@ -38,89 +38,133 @@ ACTIVE_AWARDS_FOLDER_PATH <- "Data/active_awards/"
 PHOENIX_TRANSACTION_FOLDER_PATH <- "Data/phoenix_transactions/"
 PHOENIX_PIPELINE_FOLDER_PATH <- "Data/phoenix_pipeline/"
 
-#FILTERS------------------------------------------------
-PROGRAM_AREA_FILTER <- c("A11", "A26", "EG.3", "EG.10", "HL.1",
-                         "HL.2", "HL.3", "HL.4","HL.5", "HL.6", "HL.7",
-                         "HL.8", "HL.9", "PO.1", "PO.2", "DR.3", "DR.4", "DR.6")
-
-
-DISTRIBUTION_FILTER <- c("656-GH-M", "656-GH-W", "656-W", "656-M")
-
-
-OBLIGATION_TYPE_FILTER <-  c("OBLG_SUBOB", "OBLG_UNI")
-
-PROGRAM_SUB_ELEMENT_FILTER <- c("A0158", "A0159", "A0161", "A0162",
-                                "A0163", "A0165", "A0166", "A0168",
-                                "A0170", "A0171", "A0187", "A0188",
-                                "A0189", "A0190", "A0191", "A0192", 
-                                "A0194", "A0204", "A0206", "A0207",
-                                "A0210", "A0211", "A0212", "A0213",
-                                "A0214", "A0215", "A0216", "A0217",
-                                "A0218", "A0219", "A0220", "A0221",
-                                "A0222", "A0223", "A0224", "A0225",
-                                "A0226", "A0227", "A0228", "A0229",
-                                "A0238", "A0239", "A0240", "A0244", 
-                                "A0245", "A0410", "A0417", "A0419",
-                                "A0420", "PO.1.1.2", "PO.1.1.6")
-
-
+#FILTERS ------------------------------------------------
+EVENT_TYPE_FILTER <- c("OBLG_UNI", "OBLG_SUBOB")
+DISTRIBUTION_FILTER <- c("656-M", "656-GH-M", "656-W", "656-GH-W")
 
 #READ ALL FUNCTIONS ------------------------------------'
 
 source("Scripts/utilities.R")
 source("Scripts/tests.R")
 
+#FUNCTIONS----------------------------------------
+create_active_awards_df <- function(ACTIVE_AWARDS_PATH){
+    
+    active_awards_input_file <- dir(ACTIVE_AWARDS_PATH,
+                                    full.name = TRUE,
+                                    pattern = "*.xlsx")
+    
+    active_awards_df <- map(active_awards_input_file, create_active_awards) |> 
+        bind_rows()
+}
+
+create_sub_obligation_df <- function(SUBOBLIGATION_SUMMARY_PATH){
+    
+    sub_obligation_input_file <- dir(SUBOBLIGATION_SUMMARY_PATH, 
+                                     full.name = TRUE, 
+                                     pattern = "*.xlsx")
+    
+    subobligation_summary_df <- map(sub_obligation_input_file, create_subobligation_summary) |> 
+        bind_rows()
+}
+
+create_phoenix_pipeline_df <- function(PHOENIX_PIPELINE_PATH){
+    
+    phoenix_pipeline_input_file <- dir(PHOENIX_PIPELINE_PATH,
+                                       full.name = TRUE,
+                                       pattern = "*.xlsx")
+    
+    phoenix_pipeline_df <- map(phoenix_pipeline_input_file, 
+                               ~create_phoenix_pipeline(.x, active_award_number, 
+                                                        EVENT_TYPE_FILTER,
+                                                        DISTRIBUTION_FILTER)) |>
+        bind_rows()
+}
+
+create_phoenix_transaction_df <- function(PHOENIX_TRANSACTION_PATH, active_award_number){
+    
+    phoenix_transaction_input_file <- dir(PHOENIX_TRANSACTION_PATH,
+                                         full.name = TRUE,
+                                         pattern = "*.xlsx")
+    
+    phoenix_transaction_df <- map(phoenix_transaction_input_file, 
+                                  ~create_phoenix_transaction(.x, active_award_number,
+                                                              DISTRIBUTION_FILTER)) |> 
+        bind_rows()
+    
+    phoenix_transaction_disbursement_fy <- phoenix_transaction_df |> 
+        select(award_number, fiscal_year, quarter, program_area, transaction_disbursement, period) |>
+        arrange(award_number, fiscal_year, quarter)  |> 
+        group_by(award_number, fiscal_year, program_area) |> 
+        mutate(cumulative_transaction_disbursement_fy = cumsum(transaction_disbursement))  |> 
+        ungroup() |> 
+        select(-c(fiscal_year, quarter, transaction_disbursement))
+    
+    phoenix_transaction_df <- phoenix_transaction_df |>
+        left_join(phoenix_transaction_disbursement_fy, by = c("award_number", "period", "program_area")) |> 
+        select(-c(fiscal_year, quarter))
+}
+
+create_pipeline_dataset<- function(){
+    
+    active_awards_one_row <- active_awards_df |> 
+        left_join(phoenix_pipeline_df, by = c("award_number", "period")) |> 
+        filter(!str_detect(activity_name, "MEL")) |> #remove MEL
+        left_join(subobligation_summary_df, by = c("award_number", "period", "program_area")) |> 
+        left_join(phoenix_transaction_df, by = c("award_number", "period", "program_area")) |> 
+        mutate(across(where(is.numeric), ~ replace_na(., 0))) |> 
+        mutate(program_area_name = case_when(program_area == "HL.1" ~ "HIV/AIDS",
+                                             program_area == "HL.6" ~ "MCH",
+                                             program_area == "HL.4"~ "GHS" ,
+                                             program_area == "HL.9"~ "Nutrition",
+                                             program_area == "HL.7"~  "FP/RH",
+                                             program_area == "HL.2" ~ "TB",
+                                             program_area == "HL.3" ~ "Malaria",
+                                             program_area == "HL.8" ~ "WASH",
+                                             program_area == "PO.1"~ "PD&L",
+                                             program_area == "DR.4" ~ "Civil Society",
+                                             program_area == "DR.6" ~ "Human Rights",
+                                             program_area == "DR.3" ~ "Political Competition and Consensus-Building",
+                                             TRUE ~ as.character(program_area)    
+                                             
+        ))  
+    
+}
+
+create_transaction_dataset <- function() {
+    #latest active awards with accrual amount
+    active_awards_accrual_latest <- pipeline_dataset |> 
+        filter(period == max(period)) |> 
+        group_by(award_number, period) |> 
+        summarise(last_qtr_accrual_amt = sum(last_qtr_accrual_amt, na.rm = TRUE), .groups = "drop")
+    
+    active_awards_one_row_transaction <- active_awards_df |> 
+        select(award_number, activity_name) |> 
+        distinct() |> #needed as there are multiple lines due to period
+        left_join(phoenix_transaction_df, by = "award_number") |> 
+        select(award_number, activity_name, transaction_disbursement,
+               transaction_obligation, transaction_amt, avg_monthly_exp_rate, period) |> 
+        left_join(active_awards_accrual_latest, by = c("award_number", "period")) |> 
+        mutate(across(where(is.numeric), ~ replace_na(., 0)))  
+    
+}
+
 #READ DATA----------------------------------------
-
-#Active Awards
-active_awards_input_file <- dir(ACTIVE_AWARDS_FOLDER_PATH,
-                                full.name = TRUE,
-                                pattern = "*.xlsx")
-
-active_awards_df <- map(active_awards_input_file, create_active_awards) |> 
-    bind_rows()
-
-
-#Subobligation Summary
-sub_obligation_input_file <- dir(SUBOBLIGATION_SUMMARY_FOLDER_PATH, 
-                                 full.name = TRUE, 
-                                 pattern = "*.xlsx")
-
-subobligation_summary_df <- map(sub_obligation_input_file, create_subobligation_summary) |> 
-    bind_rows()
-
-
-#List of all active award numbers
+active_awards_df <- create_active_awards_df(ACTIVE_AWARDS_FOLDER_PATH) 
 #all active award IDs
 active_award_number <- active_awards_df |> 
     select(award_number) |> 
     distinct() |> 
     pull()
 
-
-# Phoenix - pipeline
-phoenix_pipeline_input_file <- dir(PHOENIX_PIPELINE_FOLDER_PATH,
-                                   full.name = TRUE,
-                                   pattern = "*.xlsx")
-
-phoenix_pipeline_df <- map(phoenix_pipeline_input_file, 
-                           ~create_phoenix_pipeline(.x, active_award_number)) |>
-    bind_rows()
-
-# Phoenix - transaction
-phoenix_transaction_input_file <- dir(PHOENIX_TRANSACTION_FOLDER_PATH,
-                                      full.name = TRUE,
-                                      pattern = "*.xlsx")
-
-
-phoenix_transaction_df <- map(phoenix_transaction_input_file, 
-                              ~create_phoenix_transaction(.x, active_award_number)) |> 
-    bind_rows() 
-
+subobligation_summary_df <- create_sub_obligation_df(SUBOBLIGATION_SUMMARY_FOLDER_PATH)
+phoenix_pipeline_df <- create_phoenix_pipeline_df(PHOENIX_PIPELINE_FOLDER_PATH)
+phoenix_transaction_df <- create_phoenix_transaction_df(PHOENIX_TRANSACTION_FOLDER_PATH, active_award_number)
 
 
 # CREATE PIPELINE DATASET (one row per award, per quarter per program area name)
 
+<<<<<<< HEAD
 active_awards_one_row <- active_awards_df |> 
     left_join(subobligation_summary_df, by = c("award_number", "period")) |> 
     filter(!str_detect(activity_name, "MEL")) |> 
@@ -157,27 +201,47 @@ active_awards_one_row_transaction <- active_awards_df |>
 
 
 write_csv(active_awards_one_row_transaction, "Dataout/transaction.csv")
+=======
+pipeline_dataset <- create_pipeline_dataset()
+write_csv(pipeline_dataset,"Dataout/pipeline.csv")
+
+
+# CREATE TRANSACTION DATASET (one row per award, per transaction per program area)
+transaction_dataset <- create_transaction_dataset()
+write_csv(transaction_dataset, "Dataout/transaction.csv")
+>>>>>>> 769bc45fb9e31d71af6d0087b57d253c12be4dcb
 
 #RUN TESTS ------------------------------------------------------------------
 
-award_exists <- test_awards(active_awards_df, subobligation_summary_df, 
-                            phoenix_pipeline_df, phoenix_transaction_quarter)
-write_csv(award_exists, "Dataout/awards_exist.csv")
+test_award_exists <- test_awards(active_awards_df, subobligation_summary_df, 
+                            phoenix_pipeline_df, phoenix_transaction_df)
+write_csv(test_award_exists, "Dataout/awards_exist.csv")
 
 # shows missing program areas - needed to bring all data over
-program_area_missing <- test_missing_program_area(active_awards_df, subobligation_summary_df)
-write_csv(program_area_missing, "Dataout/program_area_missing.csv")
+test_program_area_exists <- test_missing_program_area(active_awards_df, subobligation_summary_df)
+write_csv(test_program_area_exists, "Dataout/program_area_missing.csv")
 
 
 # program area missing 
-program_area_test <- test_program_area(active_awards_df, subobligation_summary_df, 
+test_program_area_all <- test_program_area(active_awards_df, subobligation_summary_df, 
                                        phoenix_transaction_df, phoenix_pipeline_df, active_award_number)
-write_csv(program_area_test, "Dataout/program_area_all_datasets.csv")
+write_csv(test_program_area_all, "Dataout/program_area_all_datasets.csv")
 
 
 # Data not included in Tableau - but shows if anything has been assigned to the program area PO.2
-po_2_test <- test_po_2(active_awards_df, phoenix_pipeline_df, phoenix_transaction_df, active_award_number)
+test_po_2_exists <- test_po_2(active_awards_df, phoenix_pipeline_df, phoenix_transaction_df, active_award_number)
+write_csv(test_po_2_exists, "Dataout/po_2_test.csv")
 
-write_csv(po_2_test, "Dataout/po_2_test.csv")
+
+<<<<<<< HEAD
+=======
+#checking numbers in raw data
+
+test_raw_pipeline <- test_pipeline_number(phoenix_pipeline_df, active_awards_df, pipeline_dataset)
+write_csv(test_raw_pipeline, "Dataout/pipeline_test_all.csv")
 
 
+       
+
+    
+>>>>>>> 769bc45fb9e31d71af6d0087b57d253c12be4dcb
