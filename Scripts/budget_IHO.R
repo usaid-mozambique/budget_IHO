@@ -132,8 +132,9 @@ phoenix_transaction_quarter <- phoenix_transaction_df |>
     summarise(across(where(is.numeric), sum), .groups = "drop") 
 
 active_awards_one_row_phoenix <- active_awards_one_row |> 
-    left_join(phoenix_transaction_quarter, by = c("award_number", "period", "program_area"))
-    
+    left_join(phoenix_transaction_quarter, by = c("award_number", "period", "program_area"))|> 
+    mutate(across(where(is.numeric), ~ replace_na(., 0)))
+
 write_csv(active_awards_one_row_phoenix,"Dataout/pipeline.csv")
 
 
@@ -151,7 +152,8 @@ active_awards_one_row_transaction <- active_awards_df |>
     left_join(phoenix_transaction_df, by = "award_number") |> 
     select(award_number, activity_name,transaction_date,transaction_disbursement,
            transaction_obligation, transaction_amt, avg_monthly_exp_rate, period) |> 
-    left_join(active_awards_accrual_latest, join_by(award_number == "award_number", period == period)) 
+    left_join(active_awards_accrual_latest, join_by(award_number == "award_number", period == period)) |> 
+    mutate(across(where(is.numeric), ~ replace_na(., 0)))
 
 
 write_csv(active_awards_one_row_transaction, "Dataout/transaction.csv")
@@ -177,6 +179,5 @@ write_csv(program_area_test, "Dataout/program_area_all_datasets.csv")
 po_2_test <- test_po_2(active_awards_df, phoenix_pipeline_df, phoenix_transaction_df, active_award_number)
 
 write_csv(po_2_test, "Dataout/po_2_test.csv")
-
 
 
