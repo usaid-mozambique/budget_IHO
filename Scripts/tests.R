@@ -280,8 +280,7 @@ test_transaction_number_transaction <- function(active_awards, phoenix_transacti
 #' @export
 #'
 #' @examples
-test_pipeline_number <- function(raw_phoenix_pipeline, raw_active_awards, new_pipeline,
-                                 ){
+test_pipeline_number <- function(raw_phoenix_pipeline, raw_active_awards, new_pipeline){
   
   #original active awards dataset   
   test_raw_active_awards <- raw_active_awards |> 
@@ -298,7 +297,7 @@ test_pipeline_number <- function(raw_phoenix_pipeline, raw_active_awards, new_pi
     rename(raw_document_amt = document_amt, 
            raw_disbursement_amt = disbursement_amt,
            raw_last_qtr_accrual_amt = last_qtr_accrual_amt,
-           raw_undisbursed_amt = undisbursed_amt) |> 
+         raw_undisbursed_amt = undisbursed_amt) |> 
     left_join(test_raw_active_awards, by = c("award_number", "period")) |> 
     select(award_number, activity_name, period, everything())
   
@@ -328,7 +327,6 @@ test_pipeline_number <- function(raw_phoenix_pipeline, raw_active_awards, new_pi
            raw_document_amt, new_document_amt, document_dif, 
            raw_disbursement_amt, new_disbursement_amt, disbursement_dif,
            raw_last_qtr_accrual_amt, new_last_qtr_accrual_amt, last_qtr_accrual_diff,
-  #         raw_total_estimated_cost, new_total_estimated_cost, TEA_dff,
            raw_undisbursed_amt, new_undisbursed_amt, undisbursed_diff)  
   
   return(test_final)
@@ -336,40 +334,40 @@ test_pipeline_number <- function(raw_phoenix_pipeline, raw_active_awards, new_pi
 }
 
 
-test_subobligation_numbers <- function(active_awards, subobligation_summary, new_pipeline){
+#test_subobligation_numbers <- function(active_awards, subobligation_summary, new_pipeline){
   
-  test_active_awards <- active_awards |> 
-    select(award_number, activity_name) |> 
-    distinct()
+#  test_active_awards <- active_awards |> 
+#    select(award_number, activity_name) |> 
+#    distinct()
   
-  test_raw_subobligation <- subobligation_summary |> 
-    select(-c(planned_sub_oblig_date, program_area, comments)) |> 
-    group_by(award_number, period) |> 
-    summarise(across(where(is.numeric), ~ sum(., na.rm = TRUE)), .groups = "drop") |> 
-    left_join(test_active_awards, by = "award_number") |> 
-    mutate(across(where(is.numeric), ~ paste0("raw_",.)))
+#  test_raw_subobligation <- subobligation_summary |> 
+#    select(-c(planned_sub_oblig_date, program_area, comments)) |> 
+#    group_by(award_number, period) |> 
+#    summarise(across(where(is.numeric), ~ sum(., na.rm = TRUE)), .groups = "drop") |> 
+#    left_join(test_active_awards, by = "award_number") |> 
+#    mutate(across(where(is.numeric), ~ paste0("raw_",.)))
   
-  test_pipeline <- new_pipeline |> 
-    select(-c(sub_sector, program_area, program_area_name, comments, start_date, end_date,
-              planned_sub_oblig_date, total_estimated_cost, u_s_org_local,
-              aor_cor_or_activity_manager, funding_type, pepfar_funding, 
-              document_amt, disbursement_amt, undisbursed_amt, last_qtr_accrual_amt, 
-              total_disbursement_outlays, transaction_amt, 
-              transaction_disbursement, transaction_obligation, )) |> 
-    group_by(award_number, period) |> 
-    summarise(across(where(is.numeric), ~ sum(., na.rm = TRUE)), .groups = "drop") |> 
-    left_join(test_active_awards, by = "award_number") |> 
-    mutate(across(where(is.numeric), ~ paste0("raw_",.)))
+#  test_pipeline <- new_pipeline |> 
+#    select(-c(sub_sector, program_area, program_area_name, comments, start_date, end_date,
+#              planned_sub_oblig_date, total_estimated_cost, u_s_org_local,
+#              aor_cor_or_activity_manager, funding_type, pepfar_funding, 
+#              document_amt, disbursement_amt, undisbursed_amt, last_qtr_accrual_amt, 
+#              total_disbursement_outlays, transaction_amt, 
+#              transaction_disbursement, transaction_obligation, )) |> 
+#    group_by(award_number, period) |> 
+#    summarise(across(where(is.numeric), ~ sum(., na.rm = TRUE)), .groups = "drop") |> 
+#    left_join(test_active_awards, by = "award_number") |> 
+#    mutate(across(where(is.numeric), ~ paste0("raw_",.)))
+#  
+#  final <- test_raw_subobligation |> 
+#    left_join(test_pipeline, by = c("award_number", "period")) |> 
+#    mutate(across(where(is.numeric), ~ replace_na(., 0)) ) |> 
+#    mutate(subobligation_diff = raw_subobligation_amt - new_subobligation_amt) |> 
+#    select(award_number, period, 
+#           raw_subobligation_amt, new_subobligation_amt, subobligation_diff)
   
-  final <- test_raw_subobligation |> 
-    left_join(test_pipeline, by = c("award_number", "period")) |> 
-    mutate(across(where(is.numeric), ~ replace_na(., 0)) ) |> 
-    mutate(subobligation_diff = raw_subobligation_amt - new_subobligation_amt) |> 
-    select(award_number, period, 
-           raw_subobligation_amt, new_subobligation_amt, subobligation_diff)
+#  return(final)
   
-  return(final)
-  
-})
+#}
 
 

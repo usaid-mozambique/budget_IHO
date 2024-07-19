@@ -41,6 +41,7 @@ PHOENIX_PIPELINE_FOLDER_PATH <- "Data/phoenix_pipeline/"
 #FILTERS ------------------------------------------------
 EVENT_TYPE_FILTER <- c("OBLG_UNI", "OBLG_SUBOB")
 DISTRIBUTION_FILTER <- c("656-M", "656-GH-M", "656-W", "656-GH-W")
+REMOVE_AWARDS <- c("MEL", "FORTE")
 
 #READ ALL FUNCTIONS ------------------------------------'
 
@@ -55,7 +56,8 @@ create_active_awards_df <- function(ACTIVE_AWARDS_PATH){
                                     pattern = "*.xlsx")
     
     active_awards_df <- map(active_awards_input_file, create_active_awards) |> 
-        bind_rows()
+        bind_rows() |> 
+    filter(!str_detect(activity_name, paste(REMOVE_AWARDS, collapse = "|"))) 
 }
 
 create_sub_obligation_df <- function(SUBOBLIGATION_SUMMARY_PATH){
@@ -83,14 +85,16 @@ create_phoenix_pipeline_df <- function(PHOENIX_PIPELINE_PATH){
 
 create_phoenix_transaction_df <- function(PHOENIX_TRANSACTION_PATH, active_award_number){
     
-    phoenix_transaction_input_file <- dir(PHOENIX_TRANSACTION_PATH,
+    phoenix_transaction_input_file <- dir(PHOENIX_TRANSACTION_FOLDER_PATH,
                                          full.name = TRUE,
                                          pattern = "*.xlsx")
     
     phoenix_transaction_df <- map(phoenix_transaction_input_file, 
                                   ~create_phoenix_transaction(.x, active_award_number,
                                                               DISTRIBUTION_FILTER)) |> 
-        bind_rows()
+        bind_rows() |> 
+        group_by(award_number, period, program_area, fiscal_year, quarter) |>
+        summarise(across(where(is.numeric), ~sum(., na.rm = TRUE)), .groups = "drop")
     
     phoenix_transaction_disbursement_fy <- phoenix_transaction_df |> 
         select(award_number, fiscal_year, quarter, program_area, transaction_disbursement, period) |>
@@ -109,7 +113,6 @@ create_pipeline_dataset<- function(){
     
     active_awards_one_row <- active_awards_df |> 
         left_join(phoenix_pipeline_df, by = c("award_number", "period")) |> 
-        filter(!str_detect(activity_name, "MEL")) |> #remove MEL
         left_join(subobligation_summary_df, by = c("award_number", "period", "program_area")) |> 
         left_join(phoenix_transaction_df, by = c("award_number", "period", "program_area")) |> 
         mutate(across(where(is.numeric), ~ replace_na(., 0))) |> 

@@ -163,7 +163,11 @@ create_phoenix_transaction <- function(PHOENIX_TRANSACTION_PATH, active_award_nu
     
     temp <- readxl::read_xlsx(PHOENIX_TRANSACTION_PATH,
                               col_types = "text") |> 
-        clean_names() |> 
+        clean_names() |>
+        select(award_number, document_number, obl_document_number,
+               transaction_date, transaction_amt, transaction_event,
+               transaction_event_type, program_element, distribution,
+               program_area) |>
         filter(distribution %in% distribution_filter) |>
         mutate(
             transaction_amt = as.numeric(transaction_amt),
@@ -196,17 +200,30 @@ create_phoenix_transaction <- function(PHOENIX_TRANSACTION_PATH, active_award_nu
                                                .default = NA_real_),
             avg_monthly_exp_rate = transaction_disbursement/3
         ) |> 
-        filter(award_number %in% active_award_number) |>
-
+        filter(award_number %in% active_award_number) |> 
+        select(-c(program_element, transaction_event_type, transaction_event,
+                                    document_number, obl_document_number,
+                  )) |> 
         group_by(award_number, 
-                 period, 
+                period, 
                  program_area) |> 
-        summarise(across(where(is.numeric), ~sum(., na.rm = TRUE)), .groups = "drop") |> 
+        summarise(across(where(is.numeric), ~sum(., na.rm = TRUE)), .groups = "drop") |>
+
         separate(period, into = c("fiscal_year", "quarter"), sep = "Q", convert = TRUE, remove = FALSE) |> 
         mutate(
             fiscal_year = as.numeric(str_sub(fiscal_year, 3, 4)) + 2000,
             quarter = as.numeric(quarter)
-        )
+        ) |>
+        group_by(award_number, fiscal_year, quarter, period, program_area) |>
+      summarise(across(where(is.numeric), ~sum(., na.rm = TRUE)), .groups = "drop")
+#      group_by(award_number, period, program_area) |>
+#      summarise(transaction_disbursement = sum(transaction_disbursement, na.rm = TRUE),
+#                transaction_obligation = sum(transaction_obligation, na.rm = TRUE),
+#                transaction_amt = sum(transaction_amt, na.rm = TRUE),
+#                avg_monthly_exp_rate = sum(avg_monthly_exp_rate, na.rm = TRUE),
+#                .groups = "drop") |> 
+      #mutate(across(where(is.numeric), ~replace_na(., 0)
+    
 
     return(temp)
 }
