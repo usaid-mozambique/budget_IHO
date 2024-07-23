@@ -21,6 +21,7 @@ library(stringr)
 library(readxl)
 library(readr)
 
+
 # OTHER SETUP  - only run one-time --------------------------------------
 
 folder_setup() 
@@ -29,8 +30,6 @@ folder_setup(folder_list = list("Data/subobligation_summary",
                                 "Data/phoenix_transactions", 
                                 "Data/phoenix_pipeline"))
 
-
-#PATHS---------------------------------------------
 
 # This should match the existing folder structure
 SUBOBLIGATION_SUMMARY_FOLDER_PATH <-  "Data/subobligation_summary/"
@@ -138,17 +137,33 @@ create_transaction_dataset <- function() {
     #latest active awards with accrual amount
     active_awards_accrual_latest <- pipeline_dataset |> 
         filter(period == max(period)) |> 
-        group_by(award_number, period) |> 
+        group_by(award_number, period, program_area) |> 
         summarise(last_qtr_accrual_amt = sum(last_qtr_accrual_amt, na.rm = TRUE), .groups = "drop")
     
     active_awards_one_row_transaction <- active_awards_df |> 
-        select(award_number, activity_name) |> 
+         select(award_number, activity_name) |> 
         distinct() |> #needed as there are multiple lines due to period
         left_join(phoenix_transaction_df, by = "award_number") |> 
         select(award_number, activity_name, transaction_disbursement,
-               transaction_obligation, transaction_amt, avg_monthly_exp_rate, period) |> 
-        left_join(active_awards_accrual_latest, by = c("award_number", "period")) |> 
-        mutate(across(where(is.numeric), ~ replace_na(., 0)))  
+               transaction_obligation, transaction_amt, avg_monthly_exp_rate, 
+               period, program_area) |> 
+        left_join(active_awards_accrual_latest, by = c("award_number", "period", "program_area")) |> 
+        mutate(across(where(is.numeric), ~ replace_na(., 0)))  |> 
+        mutate(program_area_name = case_when(program_area == "HL.1" ~ "HIV/AIDS",
+                                             program_area == "HL.6" ~ "MCH",
+                                             program_area == "HL.4"~ "GHS" ,
+                                             program_area == "HL.9"~ "Nutrition",
+                                             program_area == "HL.7"~  "FP/RH",
+                                             program_area == "HL.2" ~ "TB",
+                                             program_area == "HL.3" ~ "Malaria",
+                                             program_area == "HL.8" ~ "WASH",
+                                             program_area == "PO.1"~ "PD&L",
+                                             program_area == "DR.4" ~ "Civil Society",
+                                             program_area == "DR.6" ~ "Human Rights",
+                                             program_area == "DR.3" ~ "Political Competition and Consensus-Building",
+                                             TRUE ~ as.character(program_area)    
+                                             
+        )) 
     
 }
 

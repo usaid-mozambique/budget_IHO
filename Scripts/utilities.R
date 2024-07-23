@@ -79,7 +79,6 @@ create_subobligation_summary <- function(SUBOBLIGATION_SUMMARY_PATH){
             across(where(is.numeric), ~ ifelse(is.na(.), NA_real_, .)),
             
         )  |> 
-  #      separate(period, into = c("fiscal_year", "quarter"), sep = "Q", remove = FALSE) |> 
         mutate_if(is.numeric, ~replace_na(., 0)) |> 
         select(-program_area_name)
     
