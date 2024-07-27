@@ -131,6 +131,17 @@ create_pipeline_dataset<- function(){
                                              
         ))  
     
+    temp_comments <- active_awards_one_row |> 
+        select(award_number, period, comments) |> 
+        drop_na(comments) |>
+        distinct()
+    
+    active_awards_one_row <- active_awards_one_row |>
+        select(-comments) |> 
+        left_join(temp_comments, by = c("award_number", "period"))
+    
+    return(active_awards_one_row)
+    
 }
 
 create_transaction_dataset <- function() {
@@ -184,7 +195,6 @@ phoenix_transaction_df <- create_phoenix_transaction_df(PHOENIX_TRANSACTION_FOLD
 
 pipeline_dataset <- create_pipeline_dataset()
 write_csv(pipeline_dataset,"Dataout/pipeline.csv")
-
 
 # CREATE TRANSACTION DATASET (one row per award, per transaction per program area)
 transaction_dataset <- create_transaction_dataset()

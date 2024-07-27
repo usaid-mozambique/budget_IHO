@@ -41,11 +41,16 @@ create_active_awards <- function(ACTIVE_AWARDS_PATH){
 #'
 #' @examples
 create_subobligation_summary <- function(SUBOBLIGATION_SUMMARY_PATH){
-    temp <- readxl::read_xlsx(SUBOBLIGATION_SUMMARY_PATH,
+    
+  
+  lookup <- c("unliquidated_obligations_beg_fy" = "unliquidated_obligations_at_the_beginning_of_the_fy")
+  
+  temp <- readxl::read_xlsx(SUBOBLIGATION_SUMMARY_PATH,
                               sheet = "Sheet1", 
                               skip = 1) |> 
         mutate(filename = basename(SUBOBLIGATION_SUMMARY_PATH)) |> 
         clean_names() |> 
+        rename_with(~lookup[.x], any_of(names(lookup))) |> 
         mutate(award_number = str_trim(award_number),
                period = str_extract(filename, "^[^_]+")
                
@@ -82,15 +87,6 @@ create_subobligation_summary <- function(SUBOBLIGATION_SUMMARY_PATH){
         mutate_if(is.numeric, ~replace_na(., 0)) |> 
         select(-program_area_name)
     
-    temp_comments <- temp |> 
-        select(award_number, period, comments) |> 
-       drop_na(comments) |> 
-        distinct()
-    
-    temp <- temp |>
-        select(-comments) |> 
-        left_join(temp_comments, by = c("award_number", "period"))
-    
     return(temp)
 }
 
@@ -106,9 +102,13 @@ create_subobligation_summary <- function(SUBOBLIGATION_SUMMARY_PATH){
 #' @examples
 create_phoenix_pipeline <- function(PHOENIX_PIPELINE_PATH, active_award_number, obligation_type_filter, distribution_filter){
     
-    temp <- readxl::read_xlsx(PHOENIX_PIPELINE_PATH,
+ lookup <- c("last_qtr_adj_amt" = "last_qtr_accrual_amt")
+    
+  
+  temp <- readxl::read_xlsx(PHOENIX_PIPELINE_PATH,
                               col_types = "text") |> 
         clean_names() |> 
+        rename_with(~lookup[.x], any_of(names(lookup))) |> 
         filter(obligation_type %in% obligation_type_filter,
                distribution %in% distribution_filter) |>
         select(document_amt, 
@@ -215,14 +215,6 @@ create_phoenix_transaction <- function(PHOENIX_TRANSACTION_PATH, active_award_nu
         ) |>
         group_by(award_number, fiscal_year, quarter, period, program_area) |>
       summarise(across(where(is.numeric), ~sum(., na.rm = TRUE)), .groups = "drop")
-#      group_by(award_number, period, program_area) |>
-#      summarise(transaction_disbursement = sum(transaction_disbursement, na.rm = TRUE),
-#                transaction_obligation = sum(transaction_obligation, na.rm = TRUE),
-#                transaction_amt = sum(transaction_amt, na.rm = TRUE),
-#                avg_monthly_exp_rate = sum(avg_monthly_exp_rate, na.rm = TRUE),
-#                .groups = "drop") |> 
-      #mutate(across(where(is.numeric), ~replace_na(., 0)
-    
 
     return(temp)
 }
