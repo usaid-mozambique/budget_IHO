@@ -172,9 +172,7 @@ create_phoenix_transaction <- function(PHOENIX_TRANSACTION_PATH, active_award_nu
             transaction_amt = as.numeric(transaction_amt),
             transaction_date = as_date(as.numeric(transaction_date) - 1, origin = "1899-12-30"),
             transaction_date = floor_date(transaction_date, unit = "quarter"),
-            fiscal_transaction_date = transaction_date %m+% months(3),
-            period = paste0("FY", year(fiscal_transaction_date) %% 100, 
-                            "Q", quarter(fiscal_transaction_date)),
+            ,
             program_area = case_when(program_element == "A047" ~ "HL.1", 
                                          program_element == "A048" ~ "HL.2",
                                          program_element == "A049" ~ "HL.3",
@@ -214,7 +212,10 @@ create_phoenix_transaction <- function(PHOENIX_TRANSACTION_PATH, active_award_nu
             quarter = as.numeric(quarter)
         ) |>
         group_by(award_number, fiscal_year, quarter, period, program_area) |>
-      summarise(across(where(is.numeric), ~sum(., na.rm = TRUE)), .groups = "drop")
+        summarise(across(where(is.numeric), ~sum(., na.rm = TRUE)), .groups = "drop") |> 
+        mutate(fiscal_transaction_date = transaction_date %m+% months(3),
+               period = paste0("FY", year(fiscal_transaction_date) %% 100, 
+                               "Q", quarter(fiscal_transaction_date)))
 
     return(temp)
 }
