@@ -152,7 +152,7 @@ create_transaction_dataset <- function() {
         summarise(last_qtr_accrual_amt = sum(last_qtr_accrual_amt, na.rm = TRUE), .groups = "drop")
     
     active_awards_one_row_transaction <- active_awards_df |> 
-         select(award_number, activity_name) |> 
+        select(award_number, activity_name) |> 
         distinct() |> #needed as there are multiple lines due to period
         left_join(phoenix_transaction_df, by = "award_number") |> 
         select(award_number, activity_name, transaction_disbursement,
@@ -177,6 +177,8 @@ create_transaction_dataset <- function() {
         )) 
     
 }
+
+
 
 #READ DATA----------------------------------------
 active_awards_df <- create_active_awards_df(ACTIVE_AWARDS_FOLDER_PATH) 

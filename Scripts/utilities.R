@@ -19,7 +19,10 @@ create_active_awards <- function(ACTIVE_AWARDS_PATH){
                filename = basename(ACTIVE_AWARDS_PATH),
                period = str_extract(filename, "^[^_]+"),
                sub_sector = recode(sub_sector, "AFG" = "HTHS",
-                                   "PCMD" = "Family Health")
+                                   "PCMD" = "Family Health", 
+                                   "FAMILY HEALTH" = "Family Health"),
+               u_s_org_local = recode(u_s_org_local, "International" = "US/Int'l",
+                                      "US" = "US/Int'l")
         ) |> 
         mutate_if(is.numeric, ~replace_na(., 0)
                   ) |> 
@@ -150,6 +153,9 @@ create_phoenix_pipeline <- function(PHOENIX_PIPELINE_PATH, active_award_number, 
 }
 
 
+
+
+
 #' Title
 #'
 #' @param PHOENIX_TRANSACTION_PATH 
@@ -172,7 +178,7 @@ create_phoenix_transaction <- function(PHOENIX_TRANSACTION_PATH, active_award_nu
             transaction_amt = as.numeric(transaction_amt),
             transaction_date = as_date(as.numeric(transaction_date) - 1, origin = "1899-12-30"),
             transaction_date = floor_date(transaction_date, unit = "quarter"),
-            ,
+          #  count = nrows(PHOENIX_TRANSACTION_PATH),
             program_area = case_when(program_element == "A047" ~ "HL.1", 
                                          program_element == "A048" ~ "HL.2",
                                          program_element == "A049" ~ "HL.3",
@@ -201,9 +207,22 @@ create_phoenix_transaction <- function(PHOENIX_TRANSACTION_PATH, active_award_nu
         select(-c(program_element, transaction_event_type, transaction_event,
                                     document_number, obl_document_number,
                   )) |> 
-        group_by(award_number, 
-                period, 
-                 program_area) |> 
+    
+        #create at month level and add a mutate column with a 1. 
+    
+    #    temp_2 <- temp |> 
+    #      select(award_number, transaction_date, transaction_disbursement) |>
+    #      drop_na(transaction_disbursement) |> 
+    #      filter(transaction_disbursement != 0) |>
+    #      mutate(month_level = transaction_date %m+% months(3),
+    #             count = 1) |>
+    #      group_by(award_number, month_level) |>
+    
+    
+        mutate(fiscal_transaction_date = transaction_date %m+% months(3),
+             period = paste0("FY", year(fiscal_transaction_date) %% 100, 
+                             "Q", quarter(fiscal_transaction_date))) |> 
+        group_by(award_number, period, program_area) |> 
         summarise(across(where(is.numeric), ~sum(., na.rm = TRUE)), .groups = "drop") |>
 
         separate(period, into = c("fiscal_year", "quarter"), sep = "Q", convert = TRUE, remove = FALSE) |> 
@@ -212,10 +231,8 @@ create_phoenix_transaction <- function(PHOENIX_TRANSACTION_PATH, active_award_nu
             quarter = as.numeric(quarter)
         ) |>
         group_by(award_number, fiscal_year, quarter, period, program_area) |>
-        summarise(across(where(is.numeric), ~sum(., na.rm = TRUE)), .groups = "drop") |> 
-        mutate(fiscal_transaction_date = transaction_date %m+% months(3),
-               period = paste0("FY", year(fiscal_transaction_date) %% 100, 
-                               "Q", quarter(fiscal_transaction_date)))
+        summarise(across(where(is.numeric), ~sum(., na.rm = TRUE)), .groups = "drop") 
+
 
     return(temp)
 }
