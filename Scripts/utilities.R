@@ -34,6 +34,67 @@ create_active_awards <- function(ACTIVE_AWARDS_PATH){
     return(temp)
 }
 
+#' Title
+#'
+#' @param ACTIVE_AWARDS_PATH 
+#' @param CLOSE_OUT_TRACKER_PATH 
+#'
+#' @return
+#' @export
+#'
+#' @examples
+create_expired_awards <- function(ACTIVE_AWARDS_PATH){
+  
+  temp <- readxl::read_xlsx(ACTIVE_AWARDS_PATH,
+                            sheet = "Expired Awards", 
+                            skip = 1,
+  ) |> 
+    clean_names() |> 
+    filter(sector == "IHO") |> 
+    mutate(award_number = str_trim(award_number),
+           filename = basename(ACTIVE_AWARDS_PATH),
+           period = str_extract(filename, "^[^_]+"),
+           sub_sector = recode(sub_sector, "AFG" = "HTHS",
+                               "PCMD" = "Family Health", 
+                               "FAMILY HEALTH" = "Family Health"),
+           u_s_org_local = recode(u_s_org_local, "International" = "US/Int'l",
+                                  "US" = "US/Int'l"),
+           
+    ) |> 
+    select(sector, sub_sector, activity_name, award_number,
+           end_date, u_s_org_local, aor_cor_or_activity_manager,
+           period, funding_type) |> 
+    drop_na(award_number) 
+  
+  return(temp)
+
+  
+}
+
+#' Title
+#'
+#' @param CLOSE_OUT_TRACKER_PATH 
+#'
+#' @return
+#' @export
+#'
+#' @examples
+create_close_out_tracker <- function(CLOSE_OUT_TRACKER_PATH){
+  
+  temp <- readxl::read_xlsx(CLOSE_OUT_TRACKER_PATH,
+                            sheet = "IHO- Priority", 
+                            skip = 1) |> 
+    clean_names() |> 
+    mutate(award_number = str_trim(award_number),
+           filename = basename(CLOSE_OUT_TRACKER_PATH),
+           period = str_extract(filename, "^[^_]+"),
+    ) |> 
+    select(award_number, to_be_deobligated, status, period) |> 
+    drop_na(award_number) 
+  
+  return(temp)
+}
+
 
 #' Title
 #'
@@ -103,7 +164,7 @@ create_subobligation_summary <- function(SUBOBLIGATION_SUMMARY_PATH){
 #' @export
 #'
 #' @examples
-create_phoenix_pipeline <- function(PHOENIX_PIPELINE_PATH, active_award_number, obligation_type_filter, distribution_filter){
+create_phoenix_pipeline <- function(PHOENIX_PIPELINE_PATH, all_award_number, obligation_type_filter, distribution_filter){
     
  lookup <- c("last_qtr_adj_amt" = "last_qtr_accrual_amt")
     
@@ -117,7 +178,8 @@ create_phoenix_pipeline <- function(PHOENIX_PIPELINE_PATH, active_award_number, 
         select(document_amt, 
                obligation_amt, subobligation_amt, disbursement_amt, 
                undisbursed_amt, last_qtr_accrual_amt,document_number,
-               program_area, award_number, program_element
+               program_area, award_number, program_element,pipeline_amt,
+               bilateral_obl_number
         ) |> 
         
         mutate(filename = basename(PHOENIX_PIPELINE_PATH),
@@ -126,6 +188,7 @@ create_phoenix_pipeline <- function(PHOENIX_PIPELINE_PATH, active_award_number, 
                disbursement_amt = as.numeric(disbursement_amt),
                undisbursed_amt = as.numeric(undisbursed_amt),
                last_qtr_accrual_amt = as.numeric(last_qtr_accrual_amt),
+               pipeline_amt = as.numeric(pipeline_amt),
                program_area = case_when(program_element == "A047" ~ "HL.1", 
                                             program_element == "A048"~ "HL.2",
                                             program_element == "A049"~ "HL.3",
@@ -139,14 +202,14 @@ create_phoenix_pipeline <- function(PHOENIX_PIPELINE_PATH, active_award_number, 
                                             program_element == "A140"~ "PO.1",
                                             TRUE ~ program_area),
                award_number = case_when(
-                   award_number %in% active_award_number ~ award_number,
+                   award_number %in% all_award_number ~ award_number,
                    TRUE ~ document_number) ,
                total_disbursement_outlays = disbursement_amt + last_qtr_accrual_amt
                
         ) |> 
         
-        filter(award_number %in% active_award_number) |>
-        group_by(award_number, period, program_area) |>
+        filter(award_number %in% all_award_number) |>
+        group_by(award_number, period, program_area, bilateral_obl_number) |>
         summarise(across(where(is.numeric), sum), .groups = "drop")
     
     return(temp)
@@ -164,7 +227,7 @@ create_phoenix_pipeline <- function(PHOENIX_PIPELINE_PATH, active_award_number, 
 #' @export
 #'
 #' @examples
-create_phoenix_transaction <- function(PHOENIX_TRANSACTION_PATH, active_award_number, distribution_filter){
+create_phoenix_transaction <- function(PHOENIX_TRANSACTION_PATH, all_award_number, distribution_filter){
     
     temp <- readxl::read_xlsx(PHOENIX_TRANSACTION_PATH,
                               col_types = "text") |> 
@@ -236,3 +299,18 @@ create_phoenix_transaction <- function(PHOENIX_TRANSACTION_PATH, active_award_nu
 
     return(temp)
 }
+
+
+vars_new_doag <- c(
+  "656-DOAG-656-22-020-DRG",
+  "656-DOAG-656-22-019-EDU",
+  "656-DOAG-656-22-019-IH",
+  "656-DOAG-656-22-021-NUT",
+  "656-DOAG-656-22-020-EG",
+  "656-DOAG-656-22-021-ENV",
+  "656-DOAG-656-22-021-WASH"
+)
+
+
+
+

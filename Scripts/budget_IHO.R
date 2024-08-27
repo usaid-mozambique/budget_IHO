@@ -28,7 +28,8 @@ folder_setup()
 folder_setup(folder_list = list("Data/subobligation_summary", 
                                 "Data/active_awards", 
                                 "Data/phoenix_transactions", 
-                                "Data/phoenix_pipeline"))
+                                "Data/phoenix_pipeline",
+                                "Data/close_out_tracker"))
 
 
 # This should match the existing folder structure
@@ -36,11 +37,13 @@ SUBOBLIGATION_SUMMARY_FOLDER_PATH <-  "Data/subobligation_summary/"
 ACTIVE_AWARDS_FOLDER_PATH <- "Data/active_awards/"
 PHOENIX_TRANSACTION_FOLDER_PATH <- "Data/phoenix_transactions/"
 PHOENIX_PIPELINE_FOLDER_PATH <- "Data/phoenix_pipeline/"
+CLOSE_OUT_TRACKER_FOLDER_PATH <- "Data/close_out_tracker/"
 
 #FILTERS ------------------------------------------------
 EVENT_TYPE_FILTER <- c("OBLG_UNI", "OBLG_SUBOB")
 DISTRIBUTION_FILTER <- c("656-M", "656-GH-M", "656-W", "656-GH-W")
-REMOVE_AWARDS <- c("MEL", "FORTE")
+REMOVE_AWARDS <- c("MEL")
+#TODO remove if start date is after the quarter  
 
 #READ ALL FUNCTIONS ------------------------------------'
 
@@ -57,6 +60,26 @@ create_active_awards_df <- function(ACTIVE_AWARDS_PATH){
     active_awards_df <- map(active_awards_input_file, create_active_awards) |> 
         bind_rows() |> 
     filter(!str_detect(activity_name, paste(REMOVE_AWARDS, collapse = "|"))) 
+}
+
+create_expired_awards_df <- function(ACTIVE_AWARDS_PATH){
+    
+    expired_awards_input_file <- dir(ACTIVE_AWARDS_PATH,
+                                    full.name = TRUE,
+                                    pattern = "*.xlsx")
+    
+    expired_awards_df <- map(expired_awards_input_file, create_expired_awards) |> 
+        bind_rows() 
+}
+
+create_close_out_tracker_df <- function(CLOSE_OUT_TRACKER_PATH){
+    
+    close_out_tracker_input_file <- dir(CLOSE_OUT_TRACKER_PATH,
+                                    full.name = TRUE,
+                                    pattern = "*.xlsx")
+    
+    close_out_tracker_df <- map(close_out_tracker_input_file, create_close_out_tracker) |> 
+        bind_rows() 
 }
 
 create_sub_obligation_df <- function(SUBOBLIGATION_SUMMARY_PATH){
@@ -76,20 +99,20 @@ create_phoenix_pipeline_df <- function(PHOENIX_PIPELINE_PATH){
                                        pattern = "*.xlsx")
     
     phoenix_pipeline_df <- map(phoenix_pipeline_input_file, 
-                               ~create_phoenix_pipeline(.x, active_award_number, 
+                               ~create_phoenix_pipeline(.x, all_award_number, 
                                                         EVENT_TYPE_FILTER,
                                                         DISTRIBUTION_FILTER)) |>
         bind_rows()
 }
 
-create_phoenix_transaction_df <- function(PHOENIX_TRANSACTION_PATH, active_award_number){
+create_phoenix_transaction_df <- function(PHOENIX_TRANSACTION_PATH, all_award_number){
     
     phoenix_transaction_input_file <- dir(PHOENIX_TRANSACTION_FOLDER_PATH,
                                          full.name = TRUE,
                                          pattern = "*.xlsx")
     
     phoenix_transaction_df <- map(phoenix_transaction_input_file, 
-                                  ~create_phoenix_transaction(.x, active_award_number,
+                                  ~create_phoenix_transaction(.x, all_award_number,
                                                               DISTRIBUTION_FILTER)) |> 
         bind_rows() |> 
         group_by(award_number, period, program_area, fiscal_year, quarter) |>
@@ -178,20 +201,58 @@ create_transaction_dataset <- function() {
     
 }
 
+create_expired_awards_dataset <- function(){
+    
+    temp_pipeline <- phoenix_pipeline_df |> 
+        filter(award_number %in% expired_award_number) |> 
+        select(award_number, period, undisbursed_amt, bilateral_obl_number) |>
+        group_by(award_number, period, bilateral_obl_number) |>
+        summarise(undisbursed_amt = sum(undisbursed_amt, na.rm = TRUE), .groups = "drop") |> 
+        mutate(doag_new_old = case_when(
+            str_detect(bilateral_obl_number, paste(vars_new_doag, collapse = "|")) ~ "new",
+            TRUE ~ "old"
+        ))
+    
+    temp <- expired_awards_df |>
+        left_join(temp_pipeline, by = c("award_number", "period")) |> 
+       left_join(close_out_tracker_df, by = c("award_number", "period"))
+    
+    
+    latest_period <- temp %>%
+        summarise(max_period = max(period, na.rm = TRUE)) %>%
+        pull(max_period)
+    
+    # Step 2: Filter the dataset for the latest period
+    temp <- temp %>%
+        filter(period == latest_period)
+       
+        return(temp)
+}
+
 
 
 #READ DATA----------------------------------------
-active_awards_df <- create_active_awards_df(ACTIVE_AWARDS_FOLDER_PATH) 
+active_awards_df <- create_active_awards_df(ACTIVE_AWARDS_FOLDER_PATH)
+expired_awards_df <- suppressWarnings(create_expired_awards_df(ACTIVE_AWARDS_FOLDER_PATH))
 #all active award IDs
 active_award_number <- active_awards_df |> 
     select(award_number) |> 
     distinct() |> 
     pull()
 
+expired_award_number <- expired_awards_df |> 
+    select(award_number) |> 
+    distinct() |> 
+    pull()
+
+#total list of active and expired awards
+all_award_number <- c(active_award_number, expired_award_number)
+
+close_out_tracker_df <- create_close_out_tracker_df(CLOSE_OUT_TRACKER_FOLDER_PATH)
+
 subobligation_summary_df <- create_sub_obligation_df(SUBOBLIGATION_SUMMARY_FOLDER_PATH)
 phoenix_pipeline_df <- create_phoenix_pipeline_df(PHOENIX_PIPELINE_FOLDER_PATH)
-phoenix_transaction_df <- create_phoenix_transaction_df(PHOENIX_TRANSACTION_FOLDER_PATH, active_award_number)
-
+phoenix_transaction_df <- create_phoenix_transaction_df(PHOENIX_TRANSACTION_FOLDER_PATH, all_award_number)
 
 # CREATE PIPELINE DATASET (one row per award, per quarter per program area name)
 
@@ -201,6 +262,11 @@ write_csv(pipeline_dataset,"Dataout/pipeline.csv")
 # CREATE TRANSACTION DATASET (one row per award, per transaction per program area)
 transaction_dataset <- create_transaction_dataset()
 write_csv(transaction_dataset, "Dataout/transaction.csv")
+
+
+# CREATE EXPIRED AWARDS DATASET (one row per award, per quarter)
+expired_awards_dataset <- create_expired_awards_dataset()
+write_csv(expired_awards_dataset, "Dataout/expired_awards.csv")
 
 #RUN TESTS ------------------------------------------------------------------
 
@@ -231,5 +297,13 @@ write_csv(test_raw_pipeline, "Dataout/pipeline_test_all.csv")
 
 
        
+test <- active_awards_df |> 
+    select(award_number, activity_name) |> 
+    distinct()
 
+
+test_in_active_awards <- subobligation_summary_df |> 
+    select(award_number) |> 
+    distinct() |> 
+    anti_join(active_awards_df, by = c("award_number"))
     
